@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -12,7 +13,7 @@ namespace StreamsForUnity.StreamTasks {
     public bool IsCompleted { get; private set; }
 
     internal Exception Error { get; private set; }
-    private Action _continuation;
+    private Queue<Action> _continuations = new();
 
     public static StreamTask Yield(CancellationToken token = default) {
       var task = new StreamTask();
@@ -53,16 +54,22 @@ namespace StreamsForUnity.StreamTasks {
       return new StreamTaskAwaiter(this);
     }
 
-    public void ContinueWith(Action continuation) {
-      if (IsCompleted) {
+    public StreamTask ContinueWith(Action continuation) {
+      if (IsCompleted)
         continuation();
-      }
-      else if (_continuation != null) {
-        throw new InvalidOperationException();
-      }
-      else {
-        _continuation = continuation;
-      }
+      else
+        _continuations.Enqueue(continuation);
+
+      return this;
+    }
+
+    public StreamTask ContinueWith(Func<StreamTask> continuation) {
+      if (IsCompleted)
+        continuation();
+      else
+        _continuations.Enqueue(() => continuation());
+
+      return this;
     }
 
     internal void SetResult() {
@@ -83,7 +90,8 @@ namespace StreamsForUnity.StreamTasks {
 
       IsCompleted = true;
       Error = error;
-      _continuation?.Invoke();
+      while (_continuations.TryDequeue(out Action continuation))
+        continuation?.Invoke();
     }
 
   }

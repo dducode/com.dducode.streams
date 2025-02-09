@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using UnityEngine;
 
 #if ENABLE_UNITASK_INTEGRATION
 using Cysharp.Threading.Tasks;
@@ -19,6 +20,12 @@ namespace StreamsForUnity.StreamTasks.Extensions {
       var streamTask = new StreamTask();
       uniTask.ContinueWith(streamTask.SetResult);
       return streamTask;
+    }
+#endif
+
+#if UNITY_2023_1_OR_NEWER
+    public static async StreamTask ToStreamTask(this Awaitable awaitable) {
+      await awaitable;
     }
 #endif
 

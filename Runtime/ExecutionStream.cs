@@ -104,7 +104,7 @@ namespace StreamsForUnity {
 
       var streamAction = new StreamAction(_ => { });
       AddAction(streamAction, time, token, uint.MaxValue);
-      streamAction.OnDispose(onComplete);
+      streamAction.OnDispose(() => AddOnce(onComplete, token));
     }
 
     public void SetDelta(float delta) {
@@ -119,6 +119,10 @@ namespace StreamsForUnity {
 
     public void OnDispose(Action onDispose) {
       DisposeEvent += onDispose ?? throw new ArgumentNullException(nameof(onDispose));
+    }
+
+    public override string ToString() {
+      return _name;
     }
 
     internal void Update(float deltaTime) {
