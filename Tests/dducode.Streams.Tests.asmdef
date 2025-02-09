@@ -1,0 +1,16 @@
+{
+    "name": "dducode.Streams.Tests",
+    "rootNamespace": "StreamsForUnity.Tests",
+    "references": [
+        "GUID:c7b9315b3bb06e74cb9eeda4676457f5"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

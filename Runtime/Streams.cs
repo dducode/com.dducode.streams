@@ -1,0 +1,54 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using StreamsForUnity.Internal;
+using UnityEngine;
+using UnityEngine.PlayerLoop;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+namespace StreamsForUnity {
+
+  public static class Streams {
+
+    private static readonly Dictionary<Type, ExecutionStream> _connectedStreams = new();
+    private static CancellationTokenSource _streamsCancellation = new();
+
+    public static ExecutionStream Get<TSystem>() {
+#if UNITY_EDITOR
+      if (!EditorApplication.isPlaying)
+        throw new StreamsException("Cannot get stream when editor is not playing");
+#endif
+      return _connectedStreams.TryGetValue(typeof(TSystem), out ExecutionStream stream) ? stream : CreateStream<TSystem>();
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void Initialize() {
+      _streamsCancellation = new CancellationTokenSource();
+      Application.quitting += DisposeAllStreams;
+
+      CreateStream<Update.ScriptRunBehaviourUpdate>();
+      CreateStream<FixedUpdate.ScriptRunBehaviourFixedUpdate>();
+      CreateStream<PreLateUpdate.ScriptRunBehaviourLateUpdate>();
+    }
+
+    private static ExecutionStream CreateStream<TSystem>() {
+      var stream = new ExecutionStream(_streamsCancellation.Token, NamesUtility.CreateProfilerSampleName(typeof(TSystem)));
+      StreamConnector.Connect<TSystem>(stream);
+      Type systemType = typeof(TSystem);
+      _connectedStreams.Add(systemType, stream);
+      stream.OnDispose(() => _connectedStreams.Remove(systemType));
+      return stream;
+    }
+
+    private static void DisposeAllStreams() {
+      _streamsCancellation.Cancel();
+      _connectedStreams.Clear();
+      Application.quitting -= DisposeAllStreams;
+    }
+
+  }
+
+}
