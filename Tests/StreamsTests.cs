@@ -12,9 +12,11 @@ namespace StreamsForUnity.Tests {
     [Test]
     public async Task DeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
-      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(delta => {
+      var cts = new CancellationTokenSource();
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().Add(delta => {
         tcs.SetResult(Mathf.Approximately(delta, Time.deltaTime));
-      });
+        cts.Cancel();
+      }, cts.Token);
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -22,9 +24,11 @@ namespace StreamsForUnity.Tests {
     [Test]
     public async Task FixedDeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
-      Streams.Get<FixedUpdate.ScriptRunBehaviourFixedUpdate>().AddOnce(delta => {
+      var cts = new CancellationTokenSource();
+      Streams.Get<FixedUpdate.ScriptRunBehaviourFixedUpdate>().Add(delta => {
         tcs.SetResult(Mathf.Approximately(delta, Time.fixedDeltaTime));
-      });
+        cts.Cancel();
+      }, cts.Token);
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -86,7 +90,7 @@ namespace StreamsForUnity.Tests {
     public async Task SceneStreamTest() {
       var tcs = new TaskCompletionSource<bool>();
       Scene scene = SceneManager.CreateScene("Test");
-      scene.GetStream<Update.ScriptRunBehaviourUpdate>().AddOnce(_ => tcs.SetResult(true));
+      scene.GetStream<Update.ScriptRunBehaviourUpdate>().AddOnce(() => tcs.SetResult(true));
       Assert.IsTrue(await tcs.Task);
     }
 
@@ -94,11 +98,11 @@ namespace StreamsForUnity.Tests {
     public async Task ActionsChainTest() {
       var tcs = new TaskCompletionSource<bool>();
       ExecutionStream stream = Streams.Get<Update.ScriptRunBehaviourUpdate>();
-      stream.AddOnce(_ => {
+      stream.AddOnce(() => {
         Debug.Log(1);
-        stream.AddOnce(_ => {
+        stream.AddOnce(() => {
           Debug.Log(2);
-          stream.AddOnce(_ => {
+          stream.AddOnce(() => {
             Debug.Log(3);
             tcs.SetResult(true);
           });
@@ -111,11 +115,11 @@ namespace StreamsForUnity.Tests {
     public async Task PriorityActionsTest() {
       var tcs = new TaskCompletionSource<bool>();
       ExecutionStream stream = Streams.Get<Update.ScriptRunBehaviourUpdate>();
-      stream.AddOnce(_ => Debug.Log(5), priority: 5).OnDispose(() => tcs.SetResult(true));
-      stream.AddOnce(_ => Debug.Log(1), priority: 1);
-      stream.AddOnce(_ => Debug.Log(4), priority: 4);
-      stream.AddOnce(_ => Debug.Log(2), priority: 2);
-      stream.AddOnce(_ => Debug.Log(3), priority: 3);
+      stream.AddOnce(() => Debug.Log(5), priority: 5).OnDispose(() => tcs.SetResult(true));
+      stream.AddOnce(() => Debug.Log(1), priority: 1);
+      stream.AddOnce(() => Debug.Log(4), priority: 4);
+      stream.AddOnce(() => Debug.Log(2), priority: 2);
+      stream.AddOnce(() => Debug.Log(3), priority: 3);
       Assert.IsTrue(await tcs.Task);
     }
 

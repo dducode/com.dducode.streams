@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using JetBrains.Annotations;
 using StreamsForUnity.Internal;
+using StreamsForUnity.StreamTasks;
 using UnityEngine.Profiling;
 using Debug = UnityEngine.Debug;
 
@@ -27,6 +28,7 @@ namespace StreamsForUnity {
     private readonly List<StreamAction> _actionsToUpdate = new();
 
     private event Action DisposeEvent;
+    private event Action DelayedActions;
 
     private readonly CancellationToken _disposeToken;
     private readonly string _name;
@@ -76,11 +78,19 @@ namespace StreamsForUnity {
       return streamAction;
     }
 
-    public StreamAction AddOnce([NotNull] Action<float> action, CancellationToken token = default, uint priority = uint.MaxValue) {
+    public StreamAction AddOnce([NotNull] Action action, CancellationToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
-      var streamAction = new StreamAction(action);
+      var streamAction = new StreamAction(_ => action());
       AddAction(streamAction, float.Epsilon, token, priority);
+      return streamAction;
+    }
+
+    public StreamAction AddOnce([NotNull] Func<StreamTask> action, CancellationToken token = default) {
+      ValidateAddAction(action);
+
+      var streamAction = new StreamAction(_ => action());
+      AddAction(streamAction, float.Epsilon, token, uint.MaxValue);
       return streamAction;
     }
 
@@ -134,34 +144,41 @@ namespace StreamsForUnity {
       if (_lockToken != CancellationToken.None)
         return;
 
-      Profiler.BeginSample(_name);
-
       try {
         if (!_streamDeltaTime.HasValue) {
           PrepareBeforeExecution();
-          TickActionsTime(deltaTime);
           Execute(deltaTime);
+          TickActionsTime(deltaTime);
           return;
         }
 
         _accumulatedDeltaTime += deltaTime;
-
         if (_accumulatedDeltaTime < _streamDeltaTime.Value)
           return;
 
         while (_accumulatedDeltaTime > 0) {
           PrepareBeforeExecution();
-          TickActionsTime(_streamDeltaTime.Value);
           Execute(_streamDeltaTime.Value);
+          TickActionsTime(_streamDeltaTime.Value);
           _accumulatedDeltaTime -= _streamDeltaTime.Value;
         }
       }
       finally {
-        Profiler.EndSample();
+        DelayedActions?.Invoke();
+        DelayedActions = null;
       }
     }
 
     private void AddAction(StreamAction streamAction, float time, CancellationToken token, uint priority) {
+      if (StreamState == State.Running) {
+        DelayedActions += () => PerformAddAction(streamAction, time, token, priority);
+        return;
+      }
+
+      PerformAddAction(streamAction, time, token, priority);
+    }
+
+    private void PerformAddAction(StreamAction streamAction, float time, CancellationToken token, uint priority) {
       if (!_actionsByPriority.ContainsKey(priority))
         _actionsByPriority.Add(priority, new List<StreamAction>());
       _actionsByPriority[priority].Add(streamAction);
@@ -181,6 +198,8 @@ namespace StreamsForUnity {
 
     private void Execute(float deltaTime) {
       StreamState = State.Running;
+      Streams.PushStream(this);
+      Profiler.BeginSample(_name);
 
       foreach (StreamAction action in _actionsToUpdate) {
         try {
@@ -193,8 +212,11 @@ namespace StreamsForUnity {
         }
       }
 
-      _actionsToUpdate.Clear();
+      Profiler.EndSample();
+      Streams.PopStream();
       StreamState = State.Idle;
+
+      _actionsToUpdate.Clear();
     }
 
     private void CheckActionsLifecycle() {

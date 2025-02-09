@@ -11,7 +11,7 @@ namespace StreamsForUnity.Tests {
       var tcs = new TaskCompletionSource<bool>();
       var factory = new MonoStreamRunnerFactory();
       var runner = factory.Create<UpdateStreamRunner>();
-      runner.Stream.AddOnce(_ => tcs.SetResult(true));
+      runner.Stream.AddOnce(() => tcs.SetResult(true));
       Assert.IsTrue(await tcs.Task);
     }
 

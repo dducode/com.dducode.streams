@@ -13,7 +13,10 @@ namespace StreamsForUnity {
 
   public static class Streams {
 
+    internal static ExecutionStream ExecutableStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
+
     private static readonly Dictionary<Type, ExecutionStream> _connectedStreams = new();
+    private static readonly Stack<ExecutionStream> _streamsStack = new();
     private static CancellationTokenSource _streamsCancellation = new();
 
     public static ExecutionStream Get<TSystem>() {
@@ -22,6 +25,14 @@ namespace StreamsForUnity {
         throw new StreamsException("Cannot get stream when editor is not playing");
 #endif
       return _connectedStreams.TryGetValue(typeof(TSystem), out ExecutionStream stream) ? stream : CreateStream<TSystem>();
+    }
+
+    internal static void PushStream(ExecutionStream stream) {
+      _streamsStack.Push(stream);
+    }
+
+    internal static void PopStream() {
+      _streamsStack.Pop();
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
