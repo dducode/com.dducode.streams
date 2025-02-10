@@ -22,10 +22,11 @@ namespace StreamsForUnity {
 
     public State StreamState { get; private set; }
 
-    private readonly SortedDictionary<uint, List<StreamAction>> _actionsByPriority = new();
+    private readonly SortedList<uint, List<StreamAction>> _actionsByPriority = new();
     private readonly Dictionary<StreamAction, ActionLifecycle> _actionLifecycles = new();
-    private readonly Queue<StreamAction> _actionsToRemove = new();
-    private readonly Queue<StreamAction> _actionsToUpdate = new();
+    private readonly Queue<StreamAction> _actionsQueueToRemove = new();
+    private readonly List<StreamAction> _persistentQueueToUpdate = new();
+    private bool _rebuildPersistentQueue;
 
     private event Action DisposeEvent;
     private event Action DelayedActions;
@@ -191,51 +192,23 @@ namespace StreamsForUnity {
         _actionsByPriority.Add(priority, new List<StreamAction>());
       _actionsByPriority[priority].Add(streamAction);
       _actionLifecycles.Add(streamAction, new ActionLifecycle(time, token));
+      _rebuildPersistentQueue = true;
     }
 
     private void PrepareBeforeExecution() {
       CheckActionsLifecycle();
       RemoveCompletedActions();
-      SetupActionsToUpdate();
-    }
-
-    private void TickActionsTime(float deltaTime) {
-      foreach (ActionLifecycle lifecycle in _actionLifecycles.Values)
-        lifecycle.remainingTime -= deltaTime;
-    }
-
-    private void Execute(float deltaTime) {
-      StreamState = State.Running;
-      Streams.PushStream(this);
-      Profiler.BeginSample(_name);
-
-      while (_actionsToUpdate.TryDequeue(out StreamAction action)) {
-        try {
-          action.Invoke(deltaTime, _actionLifecycles[action].remainingTime);
-        }
-        catch (Exception exception) {
-          Debug.LogError($"An error occured while executing action <b>{action}</b>");
-          Debug.LogException(exception);
-          _actionsToRemove.Enqueue(action);
-        }
-      }
-
-      Profiler.EndSample();
-      Streams.PopStream();
-      StreamState = State.Idle;
+      RebuildPersistentQueue();
     }
 
     private void CheckActionsLifecycle() {
       foreach ((StreamAction action, ActionLifecycle lifecycle) in _actionLifecycles)
         if (lifecycle.remainingTime <= 0 || lifecycle.token.IsCancellationRequested)
-          _actionsToRemove.Enqueue(action);
+          _actionsQueueToRemove.Enqueue(action);
     }
 
     private void RemoveCompletedActions() {
-      while (_actionsToRemove.TryDequeue(out StreamAction action)) {
-        if (!_actionLifecycles.ContainsKey(action))
-          continue;
-
+      while (_actionsQueueToRemove.TryDequeue(out StreamAction action)) {
         if (!action.Executed)
           Debug.LogWarning($"Action {action} has not been executed yet");
 
@@ -244,14 +217,48 @@ namespace StreamsForUnity {
             break;
 
         _actionLifecycles.Remove(action);
+        _persistentQueueToUpdate.Remove(action);
         action.Dispose();
       }
     }
 
-    private void SetupActionsToUpdate() {
+    private void RebuildPersistentQueue() {
+      if (!_rebuildPersistentQueue)
+        return;
+
+      _persistentQueueToUpdate.Clear();
+
       foreach (List<StreamAction> actions in _actionsByPriority.Values)
         foreach (StreamAction action in actions)
-          _actionsToUpdate.Enqueue(action);
+          _persistentQueueToUpdate.Add(action);
+
+      _rebuildPersistentQueue = false;
+    }
+
+    private void Execute(float deltaTime) {
+      StreamState = State.Running;
+      Streams.PushStream(this);
+      Profiler.BeginSample(_name);
+
+      foreach (StreamAction action in _persistentQueueToUpdate) {
+        try {
+          action.Invoke(deltaTime, _actionLifecycles[action].remainingTime);
+        }
+        catch (Exception exception) {
+          Debug.LogError($"An error occured while executing action <b>{action}</b>");
+          Debug.LogException(exception);
+          _actionsQueueToRemove.Enqueue(action);
+        }
+      }
+
+      Profiler.EndSample();
+      Streams.PopStream();
+      StreamState = State.Idle;
+    }
+
+    private void TickActionsTime(float deltaTime) {
+      foreach (ActionLifecycle lifecycle in _actionLifecycles.Values)
+        lifecycle.remainingTime -= deltaTime;
     }
 
     private void Dispose() {
