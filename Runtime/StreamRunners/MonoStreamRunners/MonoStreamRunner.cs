@@ -18,12 +18,16 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
 
     private Scene _scene;
     private uint _siblingIndex;
+    private Transform _transform;
+    private GameObject _gameObject;
 
     public ExecutionStream CreateNested<TRunner>(string streamName = "StreamRunner") where TRunner : MonoBehaviour, IStreamRunner {
-      return new MonoStreamRunnerFactory().Create<TRunner>(transform, streamName).Stream;
+      return new MonoStreamRunnerFactory().Create<TRunner>(_transform, streamName).Stream;
     }
 
     private void Awake() {
+      _transform = transform;
+      _gameObject = gameObject;
       _stream ??= CreateStream();
     }
 
@@ -42,13 +46,13 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
     }
 
     private ExecutionStream CreateStream() {
-      var stream = new ExecutionStream(destroyCancellationToken, gameObject.name);
+      var stream = new ExecutionStream(destroyCancellationToken, _gameObject.name);
 
       _subscriptionHandle = new CancellationTokenSource();
-      _scene = gameObject.scene;
-      _siblingIndex = (uint)transform.GetSiblingIndex();
+      _scene = _gameObject.scene;
+      _siblingIndex = (uint)_transform.GetSiblingIndex();
 
-      GetBaseStream(transform.parent).Add(stream.Update, _subscriptionHandle.Token, _siblingIndex);
+      GetBaseStream(_transform.parent).Add(stream.Update, _subscriptionHandle.Token, _siblingIndex);
       Streams.Get<TBaseSystem>().Add(ReconnectStreamIfNeeded, destroyCancellationToken);
       if (predefinedActions != null && predefinedActions.GetPersistentEventCount() > 0)
         stream.Add(predefinedActions.Invoke, destroyCancellationToken);
@@ -61,11 +65,11 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
     private ExecutionStream GetBaseStream(Transform parent) {
       if (parent != null && parent.TryGetComponentInParent(out MonoStreamRunner<TBaseSystem> runner))
         return runner.Stream;
-      return gameObject.scene.GetStream<TBaseSystem>();
+      return _gameObject.scene.GetStream<TBaseSystem>();
     }
 
     private void ReconnectStreamIfNeeded(float _) {
-      if (transform.GetSiblingIndex() == _siblingIndex && gameObject.scene == _scene)
+      if (_transform.GetSiblingIndex() == _siblingIndex && _gameObject.scene == _scene)
         return;
 
       ReconnectStream();
@@ -74,9 +78,9 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
     private void ReconnectStream() {
       _subscriptionHandle.Cancel();
       _subscriptionHandle = new CancellationTokenSource();
-      _siblingIndex = (uint)transform.GetSiblingIndex();
-      _scene = gameObject.scene;
-      GetBaseStream(transform.parent).Add(Stream.Update, _subscriptionHandle.Token, _siblingIndex);
+      _siblingIndex = (uint)_transform.GetSiblingIndex();
+      _scene = _gameObject.scene;
+      GetBaseStream(_transform.parent).Add(Stream.Update, _subscriptionHandle.Token, _siblingIndex);
     }
 
   }
