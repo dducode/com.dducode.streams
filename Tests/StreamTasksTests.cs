@@ -38,6 +38,42 @@ namespace StreamsForUnity.Tests {
     }
 
     [Test]
+    public async Task WhenAllTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      int firstDelay = Random.Range(100, 1000);
+      int secondDelay = Random.Range(100, 1000);
+      int thirdDelay = Random.Range(100, 1000);
+      Debug.Log($"First delay: {firstDelay}");
+      Debug.Log($"Second delay: {secondDelay}");
+      Debug.Log($"Third delay: {thirdDelay}");
+
+      SetFailureAfterTime(2, tcs);
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
+        await StreamTask.WhenAll(StreamTask.Delay(firstDelay), StreamTask.Delay(secondDelay), StreamTask.Delay(thirdDelay));
+        tcs.SetResult(true);
+      });
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test]
+    public async Task WhenAnyTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      int firstDelay = Random.Range(100, 1000);
+      int secondDelay = Random.Range(100, 1000);
+      int thirdDelay = Random.Range(100, 1000);
+      Debug.Log($"First delay: {firstDelay}");
+      Debug.Log($"Second delay: {secondDelay}");
+      Debug.Log($"Third delay: {thirdDelay}");
+
+      SetFailureAfterTime(2, tcs);
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
+        await StreamTask.WhenAny(StreamTask.Delay(firstDelay), StreamTask.Delay(secondDelay), StreamTask.Delay(thirdDelay));
+        tcs.SetResult(true);
+      });
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test]
     public void ErrorTest() {
       try {
         StreamTask.Yield();
