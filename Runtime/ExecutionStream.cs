@@ -24,8 +24,8 @@ namespace StreamsForUnity {
 
     private readonly SortedDictionary<uint, List<StreamAction>> _actionsByPriority = new();
     private readonly Dictionary<StreamAction, ActionLifecycle> _actionLifecycles = new();
-    private readonly HashSet<StreamAction> _actionsToRemove = new();
-    private readonly List<StreamAction> _actionsToUpdate = new();
+    private readonly Queue<StreamAction> _actionsToRemove = new();
+    private readonly Queue<StreamAction> _actionsToUpdate = new();
 
     private event Action DisposeEvent;
     private event Action DelayedActions;
@@ -104,7 +104,11 @@ namespace StreamsForUnity {
 
       var streamAction = new StreamAction(_ => { });
       AddAction(streamAction, time, token, uint.MaxValue);
-      streamAction.OnDispose(() => AddOnce(onComplete, token));
+      streamAction.OnDispose(() => {
+        if (StreamState == State.Disposing)
+          return;
+        AddOnce(onComplete, token);
+      });
     }
 
     public void SetDelta(float delta) {
@@ -205,47 +209,49 @@ namespace StreamsForUnity {
       Streams.PushStream(this);
       Profiler.BeginSample(_name);
 
-      foreach (StreamAction action in _actionsToUpdate) {
+      while (_actionsToUpdate.TryDequeue(out StreamAction action)) {
         try {
           action.Invoke(deltaTime, _actionLifecycles[action].remainingTime);
         }
         catch (Exception exception) {
           Debug.LogError($"An error occured while executing action <b>{action}</b>");
           Debug.LogException(exception);
-          _actionsToRemove.Add(action);
+          _actionsToRemove.Enqueue(action);
         }
       }
 
       Profiler.EndSample();
       Streams.PopStream();
       StreamState = State.Idle;
-
-      _actionsToUpdate.Clear();
     }
 
     private void CheckActionsLifecycle() {
       foreach ((StreamAction action, ActionLifecycle lifecycle) in _actionLifecycles)
         if (lifecycle.remainingTime <= 0 || lifecycle.token.IsCancellationRequested)
-          _actionsToRemove.Add(action);
+          _actionsToRemove.Enqueue(action);
     }
 
     private void RemoveCompletedActions() {
-      foreach (StreamAction action in _actionsToRemove) {
+      while (_actionsToRemove.TryDequeue(out StreamAction action)) {
+        if (!_actionLifecycles.ContainsKey(action))
+          continue;
+
         if (!action.Executed)
           Debug.LogWarning($"Action {action} has not been executed yet");
+
         foreach (List<StreamAction> actions in _actionsByPriority.Values)
           if (actions.Remove(action))
             break;
+
         _actionLifecycles.Remove(action);
         action.Dispose();
       }
-
-      _actionsToRemove.Clear();
     }
 
     private void SetupActionsToUpdate() {
       foreach (List<StreamAction> actions in _actionsByPriority.Values)
-        _actionsToUpdate.AddRange(actions);
+        foreach (StreamAction action in actions)
+          _actionsToUpdate.Enqueue(action);
     }
 
     private void Dispose() {

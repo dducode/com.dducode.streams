@@ -1,51 +1,17 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
+using StreamsForUnity.StreamTasks.Internal;
 
 namespace StreamsForUnity.StreamTasks {
 
   [AsyncMethodBuilder(typeof(StreamTaskMethodBuilder))]
-  public class StreamTask {
+  public partial class StreamTask {
 
     public static StreamTask CompletedTask { get; } = new() { IsCompleted = true };
-
     public bool IsCompleted { get; private set; }
 
     internal Exception Error { get; private set; }
-    private Queue<Action> _continuations = new();
-
-    public static StreamTask Yield(CancellationToken token = default) {
-      var task = new StreamTask();
-      GetExecutableStream().AddOnce(task.SetResult, token);
-      token.Register(task.SetCanceled);
-      return task;
-    }
-
-    public static StreamTask Delay(uint milliseconds, CancellationToken token = default) {
-      var task = new StreamTask();
-      GetExecutableStream().AddTimer(milliseconds / 1000f, task.SetResult, token);
-      token.Register(task.SetCanceled);
-      return task;
-    }
-
-    public static StreamTask WaitWhile(Func<bool> condition, CancellationToken token = default) {
-      var task = new StreamTask();
-      var cts = new CancellationTokenSource();
-      GetExecutableStream().Add(_ => {
-        if (condition())
-          return;
-
-        task.SetResult();
-        cts.Cancel();
-      }, cts.Token);
-
-      token.Register(() => {
-        task.SetCanceled();
-        cts.Cancel();
-      });
-      return task;
-    }
+    private Action _continuation;
 
     internal StreamTask() {
     }
@@ -55,21 +21,32 @@ namespace StreamsForUnity.StreamTasks {
     }
 
     public StreamTask ContinueWith(Action continuation) {
-      if (IsCompleted)
+      if (IsCompleted) {
         continuation();
-      else
-        _continuations.Enqueue(continuation);
+        return this;
+      }
 
-      return this;
+      if (_continuation != null)
+        throw new StreamsException("Cannot set continuation after the previous continuation");
+
+      _continuation = () => {
+        continuation();
+        StreamTaskScheduler.FireCompleted(this);
+      };
+      var nextTask = new StreamTask();
+      StreamTaskScheduler.Schedule(this, nextTask);
+      return nextTask;
     }
 
     public StreamTask ContinueWith(Func<StreamTask> continuation) {
       if (IsCompleted)
-        continuation();
+        continuation().ContinueWith(() => StreamTaskScheduler.FireCompleted(this));
       else
-        _continuations.Enqueue(() => continuation());
+        _continuation = () => continuation().ContinueWith(() => StreamTaskScheduler.FireCompleted(this));
 
-      return this;
+      var nextTask = new StreamTask();
+      StreamTaskScheduler.Schedule(this, nextTask);
+      return nextTask;
     }
 
     internal void SetResult() {
@@ -80,18 +57,13 @@ namespace StreamsForUnity.StreamTasks {
       Complete(new OperationCanceledException());
     }
 
-    private static ExecutionStream GetExecutableStream() {
-      return Streams.ExecutableStream ?? throw new StreamsException("Cannot use stream tasks outside of stream execution");
-    }
-
     private void Complete(Exception error = null) {
       if (IsCompleted)
         return;
 
       IsCompleted = true;
       Error = error;
-      while (_continuations.TryDequeue(out Action continuation))
-        continuation?.Invoke();
+      _continuation?.Invoke();
     }
 
   }

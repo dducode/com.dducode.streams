@@ -13,7 +13,7 @@ namespace StreamsForUnity {
 
   public static class Streams {
 
-    internal static ExecutionStream ExecutableStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
+    public static ExecutionStream RunningStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
 
     private static readonly Dictionary<Type, ExecutionStream> _connectedStreams = new();
     private static readonly Stack<ExecutionStream> _streamsStack = new();

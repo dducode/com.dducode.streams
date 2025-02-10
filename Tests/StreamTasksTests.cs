@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
 using NUnit.Framework;
 using StreamsForUnity.StreamTasks;
-using StreamsForUnity.StreamTasks.Extensions;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 
@@ -12,12 +11,27 @@ namespace StreamsForUnity.Tests {
     [Test]
     public async Task AsyncActionTest() {
       var tcs = new TaskCompletionSource<bool>();
+      SetFailureAfterTime(2, tcs);
       Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
         Debug.Log(1);
         await StreamTask.Yield();
         Debug.Log(2);
         await StreamTask.Delay(1000);
         Debug.Log(3);
+        tcs.SetResult(true);
+      });
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test]
+    public async Task WaitWhileTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      SetFailureAfterTime(2, tcs);
+      var flag = false;
+      ExecutionStream stream = Streams.Get<Update.ScriptRunBehaviourUpdate>();
+      stream.AddTimer(1, () => flag = true);
+      stream.AddOnce(async () => {
+        await StreamTask.WaitWhile(() => !flag);
         tcs.SetResult(true);
       });
       Assert.IsTrue(await tcs.Task);
@@ -39,11 +53,41 @@ namespace StreamsForUnity.Tests {
     [Test]
     public async Task ContinuationTest() {
       var tcs = new TaskCompletionSource<bool>();
+      SetFailureAfterTime(2, tcs);
       Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
-        await Task.Delay(1000).ToStreamTask();
-        tcs.SetResult(true);
+        await StreamTask.Delay(1000).ContinueWith(() => tcs.SetResult(true));
       });
       Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test]
+    public async Task AsyncContinuationTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      SetFailureAfterTime(3, tcs);
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
+        await StreamTask.Delay(1000).ContinueWith(async () => {
+          await StreamTask.Delay(1000).ContinueWith(() => tcs.SetResult(true));
+        });
+      });
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test]
+    public async Task NestedContinuationsTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      SetFailureAfterTime(6, tcs);
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
+        await StreamTask.Delay(1000).ContinueWith(async () => {
+          await StreamTask.Delay(1000).ContinueWith(async () => {
+            await StreamTask.Delay(1000);
+          }).ContinueWith(async () => await StreamTask.Delay(1000));
+        }).ContinueWith(async () => await StreamTask.Delay(1000)).ContinueWith(() => tcs.SetResult(true));
+      });
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    private void SetFailureAfterTime(float time, TaskCompletionSource<bool> tcs) {
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddTimer(time, () => tcs.SetResult(false));
     }
 
   }
