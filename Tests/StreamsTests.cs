@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using StreamsForUnity.Tests.Attributes;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 using UnityEngine.SceneManagement;
@@ -9,7 +10,7 @@ namespace StreamsForUnity.Tests {
 
   public class StreamsTests {
 
-    [Test]
+    [Test, Common]
     public async Task DeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
       var cts = new CancellationTokenSource();
@@ -21,7 +22,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, Common]
     public async Task FixedDeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
       var cts = new CancellationTokenSource();
@@ -33,7 +34,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, Common]
     public async Task TemporaryUpdateTest() {
       var tcs = new TaskCompletionSource<bool>();
 
@@ -44,7 +45,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, Common]
     public async Task FixedUpdateTest() {
       var tcs = new TaskCompletionSource<bool>();
 
@@ -55,7 +56,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, Common]
     public async Task ConditionalTest() {
       var tcs = new TaskCompletionSource<bool>();
       var disposeHandle = new CancellationTokenSource();
@@ -69,7 +70,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, Common]
     public async Task LockStreamTest() {
       var tcs = new TaskCompletionSource<bool>();
       var lockHandle = new CancellationTokenSource();
@@ -86,7 +87,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, Common]
     public async Task SceneStreamTest() {
       var tcs = new TaskCompletionSource<bool>();
       Scene scene = SceneManager.CreateScene("Test");
@@ -94,7 +95,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, Common]
     public async Task ActionsChainTest() {
       var tcs = new TaskCompletionSource<bool>();
       ExecutionStream stream = Streams.Get<Update.ScriptRunBehaviourUpdate>();
@@ -111,7 +112,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, Common]
     public async Task PriorityActionsTest() {
       var tcs = new TaskCompletionSource<bool>();
       ExecutionStream stream = Streams.Get<Update.ScriptRunBehaviourUpdate>();

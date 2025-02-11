@@ -1,15 +1,11 @@
-using System.Threading;
-
 namespace StreamsForUnity.Internal {
 
-  internal class ActionLifecycle {
+  internal struct ActionLifecycle {
 
     internal float remainingTime;
-    internal readonly CancellationToken token;
 
-    internal ActionLifecycle(float remainingTime, CancellationToken token) {
+    internal ActionLifecycle(float remainingTime) {
       this.remainingTime = remainingTime;
-      this.token = token;
     }
 
   }

@@ -10,8 +10,7 @@ namespace StreamsForUnity.StreamTasks {
   public struct StreamTaskMethodBuilder {
 
     public StreamTask Task { get; private set; }
-
-    private IAsyncStateMachineRunner _runner;
+    private Action _onCompleted;
 
     public static StreamTaskMethodBuilder Create() {
       return new StreamTaskMethodBuilder();
@@ -36,15 +35,15 @@ namespace StreamsForUnity.StreamTasks {
     public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine {
       Task ??= new StreamTask();
-      _runner ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine);
-      awaiter.OnCompleted(_runner.Run);
+      _onCompleted ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine).Run;
+      awaiter.OnCompleted(_onCompleted);
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine {
       Task ??= new StreamTask();
-      _runner ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine);
-      awaiter.UnsafeOnCompleted(_runner.Run);
+      _onCompleted ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine).Run;
+      awaiter.UnsafeOnCompleted(_onCompleted);
     }
 
     public void SetException(Exception exception) {

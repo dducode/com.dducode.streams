@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using JetBrains.Annotations;
 using StreamsForUnity.Internal;
@@ -22,11 +21,7 @@ namespace StreamsForUnity {
 
     public State StreamState { get; private set; }
 
-    private readonly SortedList<StreamAction, ActionLifecycle> _actions = new(new StreamActionComparer());
-    private readonly Queue<StreamAction> _actionsQueueToRemove = new();
-    private readonly List<StreamAction> _persistentQueueToUpdate = new();
-    private bool _rebuildPersistentQueue;
-
+    private readonly ActionsStorage _actionsStorage = new();
     private event Action DisposeEvent;
     private event Action DelayedActions;
 
@@ -132,33 +127,13 @@ namespace StreamsForUnity {
     }
 
     internal void Update(float deltaTime) {
-      if (StreamState == State.Disposed)
-        throw new StreamsException("Cannot execute disposed stream");
-
-      if (_disposeToken.IsCancellationRequested) {
-        Dispose();
-        return;
-      }
-
-      if (StreamState == State.Running) {
-        Dispose();
-        throw new StreamsException("Recursive execution occurred");
-      }
-
-      if (_actions.Count == 0)
-        return;
-
-      if (_lockToken.IsCancellationRequested)
-        _lockToken = CancellationToken.None;
-
-      if (_lockToken != CancellationToken.None)
+      ValidateExecution();
+      if (!CanExecute())
         return;
 
       try {
         if (!_streamDeltaTime.HasValue) {
-          PrepareBeforeExecution();
           Execute(deltaTime);
-          TickActionsTime(deltaTime);
           return;
         }
 
@@ -167,9 +142,7 @@ namespace StreamsForUnity {
           return;
 
         while (_accumulatedDeltaTime > 0) {
-          PrepareBeforeExecution();
           Execute(_streamDeltaTime.Value);
-          TickActionsTime(_streamDeltaTime.Value);
           _accumulatedDeltaTime -= _streamDeltaTime.Value;
         }
       }
@@ -189,76 +162,71 @@ namespace StreamsForUnity {
     }
 
     private void PerformAddAction(StreamAction streamAction, float time, CancellationToken token) {
-      _actions.Add(streamAction, new ActionLifecycle(time, token));
-      _rebuildPersistentQueue = true;
+      _actionsStorage.Add(streamAction, time, token);
     }
 
-    private void PrepareBeforeExecution() {
-      CheckActionsLifecycle();
-      RemoveCompletedActions();
-      RebuildPersistentQueue();
-    }
-
-    private void CheckActionsLifecycle() {
-      foreach ((StreamAction action, ActionLifecycle lifecycle) in _actions)
-        if (lifecycle.remainingTime <= 0 || lifecycle.token.IsCancellationRequested)
-          _actionsQueueToRemove.Enqueue(action);
-    }
-
-    private void RemoveCompletedActions() {
-      while (_actionsQueueToRemove.TryDequeue(out StreamAction action)) {
-        if (!action.Executed)
-          Debug.LogWarning($"Action {action} has not been executed yet");
-
-        _actions.Remove(action);
-        _persistentQueueToUpdate.Remove(action);
-        action.Dispose();
+    private void ValidateExecution() {
+      switch (StreamState) {
+        case State.Disposed:
+          throw new StreamsException("Cannot execute disposed stream");
+        case State.Running:
+          Dispose();
+          throw new StreamsException("Recursive execution occurred");
+        case State.Idle:
+          break;
+        case State.Disposing:
+          break;
+        default:
+          throw new ArgumentOutOfRangeException();
       }
     }
 
-    private void RebuildPersistentQueue() {
-      if (!_rebuildPersistentQueue)
-        return;
+    private bool CanExecute() {
+      if (_disposeToken.IsCancellationRequested) {
+        Dispose();
+        return false;
+      }
 
-      _persistentQueueToUpdate.Clear();
+      if (_actionsStorage.Count == 0)
+        return false;
 
-      foreach (StreamAction action in _actions.Keys)
-        _persistentQueueToUpdate.Add(action);
+      if (_lockToken.IsCancellationRequested)
+        _lockToken = CancellationToken.None;
 
-      _rebuildPersistentQueue = false;
+      if (_lockToken != CancellationToken.None)
+        return false;
+
+      return true;
     }
 
     private void Execute(float deltaTime) {
+      _actionsStorage.Refresh();
+
       StreamState = State.Running;
       Streams.PushStream(this);
       Profiler.BeginSample(_name);
 
-      foreach (StreamAction action in _persistentQueueToUpdate) {
+      foreach (StreamAction action in _actionsStorage.GetActionsToUpdate()) {
         try {
-          action.Invoke(deltaTime, _actions[action].remainingTime);
+          action.Invoke(deltaTime, _actionsStorage.GetRemainingTime(action));
         }
         catch (Exception exception) {
           Debug.LogError($"An error occured while executing action <b>{action}</b>");
           Debug.LogException(exception);
-          _actionsQueueToRemove.Enqueue(action);
+          _actionsStorage.Remove(action);
         }
       }
 
       Profiler.EndSample();
       Streams.PopStream();
       StreamState = State.Idle;
-    }
 
-    private void TickActionsTime(float deltaTime) {
-      foreach (ActionLifecycle lifecycle in _actions.Values)
-        lifecycle.remainingTime -= deltaTime;
+      _actionsStorage.TickTime(deltaTime);
     }
 
     private void Dispose() {
       StreamState = State.Disposing;
-      foreach (StreamAction action in _actions.Keys)
-        action.Dispose();
-      _actions.Clear();
+      _actionsStorage.Dispose();
       DisposeEvent?.Invoke();
       DisposeEvent = null;
       StreamState = State.Disposed;

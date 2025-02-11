@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using StreamsForUnity.StreamTasks;
+using StreamsForUnity.Tests.Attributes;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 
@@ -9,7 +10,7 @@ namespace StreamsForUnity.Tests {
 
   public class StreamTasksTests {
 
-    [Test]
+    [Test, StreamTasks]
     public async Task AsyncActionTest() {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(2, tcs);
@@ -24,7 +25,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, StreamTasks]
     public async Task WaitWhileTest() {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(2, tcs);
@@ -38,7 +39,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, StreamTasks]
     public async Task WhenAllTest() {
       var tcs = new TaskCompletionSource<bool>();
       int firstDelay = Random.Range(100, 1000);
@@ -56,7 +57,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, StreamTasks]
     public async Task WhenAnyTest() {
       var tcs = new TaskCompletionSource<bool>();
       int firstDelay = Random.Range(100, 1000);
@@ -74,7 +75,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, StreamTasks]
     public void ErrorTest() {
       try {
         StreamTask.Yield();
@@ -87,7 +88,7 @@ namespace StreamsForUnity.Tests {
       Assert.Fail();
     }
 
-    [Test]
+    [Test, StreamTasks]
     public async Task ContinuationTest() {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(2, tcs);
@@ -97,7 +98,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, StreamTasks]
     public async Task AsyncContinuationTest() {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(3, tcs);
@@ -109,7 +110,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, StreamTasks]
     public async Task NestedContinuationsTest() {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(6, tcs);
@@ -123,7 +124,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, StreamTasks]
     public async Task MultipleContinuationsTest() {
       var tcs = new TaskCompletionSource<bool>();
       var tasks = new List<StreamTask>(5);
@@ -144,7 +145,7 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
-    [Test]
+    [Test, StreamTasks]
     public async Task MultipleAsyncContinuationsTest() {
       var tcs = new TaskCompletionSource<bool>();
       var tasks = new List<StreamTask>(5);
