@@ -22,8 +22,7 @@ namespace StreamsForUnity {
 
     public State StreamState { get; private set; }
 
-    private readonly SortedList<uint, List<StreamAction>> _actionsByPriority = new();
-    private readonly Dictionary<StreamAction, ActionLifecycle> _actionLifecycles = new();
+    private readonly SortedList<StreamAction, ActionLifecycle> _actions = new(new StreamActionComparer());
     private readonly Queue<StreamAction> _actionsQueueToRemove = new();
     private readonly List<StreamAction> _persistentQueueToUpdate = new();
     private bool _rebuildPersistentQueue;
@@ -46,8 +45,8 @@ namespace StreamsForUnity {
     public StreamAction Add([NotNull] Action<float> action, CancellationToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
-      var streamAction = new StreamAction(action);
-      AddAction(streamAction, float.PositiveInfinity, token, priority);
+      var streamAction = new StreamAction(action, priority);
+      AddAction(streamAction, float.PositiveInfinity, token);
       return streamAction;
     }
 
@@ -59,8 +58,8 @@ namespace StreamsForUnity {
 
       ValidateAddAction(action);
 
-      var streamAction = new StreamAction(action);
-      AddAction(streamAction, time, token, priority);
+      var streamAction = new StreamAction(action, priority);
+      AddAction(streamAction, time, token);
       return streamAction;
     }
 
@@ -74,24 +73,24 @@ namespace StreamsForUnity {
       var streamAction = new StreamAction(deltaTime => {
         if (condition())
           action(deltaTime);
-      });
-      AddAction(streamAction, float.PositiveInfinity, token, priority);
+      }, priority);
+      AddAction(streamAction, float.PositiveInfinity, token);
       return streamAction;
     }
 
     public StreamAction AddOnce([NotNull] Action action, CancellationToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
-      var streamAction = new StreamAction(_ => action());
-      AddAction(streamAction, float.Epsilon, token, priority);
+      var streamAction = new StreamAction(_ => action(), priority);
+      AddAction(streamAction, float.Epsilon, token);
       return streamAction;
     }
 
     public StreamAction AddOnce([NotNull] Func<StreamTask> action, CancellationToken token = default) {
       ValidateAddAction(action);
 
-      var streamAction = new StreamAction(_ => action());
-      AddAction(streamAction, float.Epsilon, token, uint.MaxValue);
+      var streamAction = new StreamAction(_ => action(), uint.MaxValue);
+      AddAction(streamAction, float.Epsilon, token);
       return streamAction;
     }
 
@@ -103,10 +102,12 @@ namespace StreamsForUnity {
 
       ValidateAddAction(onComplete);
 
-      var streamAction = new StreamAction(_ => { });
-      AddAction(streamAction, time, token, uint.MaxValue);
+      var streamAction = new StreamAction(_ => { }, uint.MaxValue);
+      AddAction(streamAction, time, token);
       streamAction.OnDispose(() => {
         if (StreamState == State.Disposing)
+          return;
+        if (token.IsCancellationRequested)
           return;
         AddOnce(onComplete, token);
       });
@@ -144,7 +145,7 @@ namespace StreamsForUnity {
         throw new StreamsException("Recursive execution occurred");
       }
 
-      if (_actionLifecycles.Count == 0)
+      if (_actions.Count == 0)
         return;
 
       if (_lockToken.IsCancellationRequested)
@@ -178,20 +179,17 @@ namespace StreamsForUnity {
       }
     }
 
-    private void AddAction(StreamAction streamAction, float time, CancellationToken token, uint priority) {
+    private void AddAction(StreamAction streamAction, float time, CancellationToken token) {
       if (StreamState == State.Running) {
-        DelayedActions += () => PerformAddAction(streamAction, time, token, priority);
+        DelayedActions += () => PerformAddAction(streamAction, time, token);
         return;
       }
 
-      PerformAddAction(streamAction, time, token, priority);
+      PerformAddAction(streamAction, time, token);
     }
 
-    private void PerformAddAction(StreamAction streamAction, float time, CancellationToken token, uint priority) {
-      if (!_actionsByPriority.ContainsKey(priority))
-        _actionsByPriority.Add(priority, new List<StreamAction>());
-      _actionsByPriority[priority].Add(streamAction);
-      _actionLifecycles.Add(streamAction, new ActionLifecycle(time, token));
+    private void PerformAddAction(StreamAction streamAction, float time, CancellationToken token) {
+      _actions.Add(streamAction, new ActionLifecycle(time, token));
       _rebuildPersistentQueue = true;
     }
 
@@ -202,7 +200,7 @@ namespace StreamsForUnity {
     }
 
     private void CheckActionsLifecycle() {
-      foreach ((StreamAction action, ActionLifecycle lifecycle) in _actionLifecycles)
+      foreach ((StreamAction action, ActionLifecycle lifecycle) in _actions)
         if (lifecycle.remainingTime <= 0 || lifecycle.token.IsCancellationRequested)
           _actionsQueueToRemove.Enqueue(action);
     }
@@ -212,11 +210,7 @@ namespace StreamsForUnity {
         if (!action.Executed)
           Debug.LogWarning($"Action {action} has not been executed yet");
 
-        foreach (List<StreamAction> actions in _actionsByPriority.Values)
-          if (actions.Remove(action))
-            break;
-
-        _actionLifecycles.Remove(action);
+        _actions.Remove(action);
         _persistentQueueToUpdate.Remove(action);
         action.Dispose();
       }
@@ -228,9 +222,8 @@ namespace StreamsForUnity {
 
       _persistentQueueToUpdate.Clear();
 
-      foreach (List<StreamAction> actions in _actionsByPriority.Values)
-        foreach (StreamAction action in actions)
-          _persistentQueueToUpdate.Add(action);
+      foreach (StreamAction action in _actions.Keys)
+        _persistentQueueToUpdate.Add(action);
 
       _rebuildPersistentQueue = false;
     }
@@ -242,7 +235,7 @@ namespace StreamsForUnity {
 
       foreach (StreamAction action in _persistentQueueToUpdate) {
         try {
-          action.Invoke(deltaTime, _actionLifecycles[action].remainingTime);
+          action.Invoke(deltaTime, _actions[action].remainingTime);
         }
         catch (Exception exception) {
           Debug.LogError($"An error occured while executing action <b>{action}</b>");
@@ -257,15 +250,15 @@ namespace StreamsForUnity {
     }
 
     private void TickActionsTime(float deltaTime) {
-      foreach (ActionLifecycle lifecycle in _actionLifecycles.Values)
+      foreach (ActionLifecycle lifecycle in _actions.Values)
         lifecycle.remainingTime -= deltaTime;
     }
 
     private void Dispose() {
       StreamState = State.Disposing;
-      foreach (StreamAction action in _actionLifecycles.Keys)
+      foreach (StreamAction action in _actions.Keys)
         action.Dispose();
-      _actionLifecycles.Clear();
+      _actions.Clear();
       DisposeEvent?.Invoke();
       DisposeEvent = null;
       StreamState = State.Disposed;

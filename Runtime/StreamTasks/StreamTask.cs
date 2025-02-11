@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using JetBrains.Annotations;
 using StreamsForUnity.StreamTasks.Internal;
 
 namespace StreamsForUnity.StreamTasks {
@@ -11,7 +13,7 @@ namespace StreamsForUnity.StreamTasks {
     public bool IsCompleted { get; private set; }
 
     internal Exception Error { get; private set; }
-    private Action _continuation;
+    private readonly Queue<Action> _continuations = new();
 
     internal StreamTask() {
     }
@@ -20,29 +22,32 @@ namespace StreamsForUnity.StreamTasks {
       return new StreamTaskAwaiter(this);
     }
 
-    public StreamTask ContinueWith(Action continuation) {
+    public StreamTask ContinueWith([NotNull] Action continuation) {
+      if (continuation == null)
+        throw new ArgumentNullException(nameof(continuation));
+
       if (IsCompleted) {
         continuation();
         return this;
       }
 
-      if (_continuation != null)
-        throw new StreamsException("Cannot set continuation after the previous continuation");
-
-      _continuation = () => {
+      _continuations.Enqueue(() => {
         continuation();
-        StreamTaskScheduler.FireCompleted(this);
-      };
+        StreamTaskScheduler.RunNext(this);
+      });
       var nextTask = new StreamTask();
       StreamTaskScheduler.Schedule(this, nextTask);
       return nextTask;
     }
 
-    public StreamTask ContinueWith(Func<StreamTask> continuation) {
+    public StreamTask ContinueWith([NotNull] Func<StreamTask> continuation) {
+      if (continuation == null)
+        throw new ArgumentNullException(nameof(continuation));
+
       if (IsCompleted)
-        continuation().ContinueWith(() => StreamTaskScheduler.FireCompleted(this));
+        continuation().ContinueWith(() => StreamTaskScheduler.RunNext(this));
       else
-        _continuation = () => continuation().ContinueWith(() => StreamTaskScheduler.FireCompleted(this));
+        _continuations.Enqueue(() => continuation().ContinueWith(() => StreamTaskScheduler.RunNext(this)));
 
       var nextTask = new StreamTask();
       StreamTaskScheduler.Schedule(this, nextTask);
@@ -63,7 +68,11 @@ namespace StreamsForUnity.StreamTasks {
 
       IsCompleted = true;
       Error = error;
-      _continuation?.Invoke();
+      if (Error != null)
+        return;
+
+      while (_continuations.TryDequeue(out Action continuation))
+        continuation();
     }
 
   }

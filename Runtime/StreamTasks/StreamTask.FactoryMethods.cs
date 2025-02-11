@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using JetBrains.Annotations;
 
@@ -49,29 +50,37 @@ namespace StreamsForUnity.StreamTasks {
     }
 
     public static StreamTask WhenAll([NotNull] params StreamTask[] tasks) {
+      return WhenAll((ICollection<StreamTask>)tasks);
+    }
+
+    public static StreamTask WhenAll([NotNull] ICollection<StreamTask> tasks) {
       if (tasks == null)
         throw new ArgumentNullException(nameof(tasks));
-      if (tasks.Length == 0)
+      if (tasks.Count == 0)
         return CompletedTask;
 
       var task = new StreamTask();
-      int tasksCount = tasks.Length;
+      int tasksCount = tasks.Count;
       var completedTasks = 0;
-      var decrement = new Action(() => {
+      var increment = new Action(() => {
         ++completedTasks;
         if (completedTasks == tasksCount)
           task.SetResult();
       });
 
       foreach (StreamTask otherTask in tasks)
-        otherTask.ContinueWith(decrement);
+        otherTask.ContinueWith(increment);
       return task;
     }
 
     public static StreamTask WhenAny([NotNull] params StreamTask[] tasks) {
+      return WhenAny((ICollection<StreamTask>)tasks);
+    }
+
+    public static StreamTask WhenAny([NotNull] ICollection<StreamTask> tasks) {
       if (tasks == null)
         throw new ArgumentNullException(nameof(tasks));
-      if (tasks.Length == 0)
+      if (tasks.Count == 0)
         return CompletedTask;
 
       var task = new StreamTask();

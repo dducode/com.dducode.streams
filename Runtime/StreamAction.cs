@@ -14,17 +14,19 @@ namespace StreamsForUnity {
       }
     }
 
-    public bool Executed { get; private set; }
+    internal bool Executed { get; private set; }
+    internal uint Priority { get; }
+    internal Guid Id { get; } = Guid.NewGuid();
 
     private event Action DisposeEvent;
     private readonly Action<float> _action;
-    private Predicate<float> _condition;
     private float? _actionDeltaTime;
     private float _accumulatedDeltaTime;
     private string _name = nameof(StreamAction);
 
-    internal StreamAction(Action<float> action) {
+    internal StreamAction(Action<float> action, uint priority) {
       _action = action;
+      Priority = priority;
     }
 
     public StreamAction SetDelta(float delta) {

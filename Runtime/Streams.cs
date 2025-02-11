@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using JetBrains.Annotations;
 using StreamsForUnity.Internal;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
@@ -13,7 +14,7 @@ namespace StreamsForUnity {
 
   public static class Streams {
 
-    public static ExecutionStream RunningStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
+    [CanBeNull] public static ExecutionStream RunningStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
 
     private static readonly Dictionary<Type, ExecutionStream> _connectedStreams = new();
     private static readonly Stack<ExecutionStream> _streamsStack = new();

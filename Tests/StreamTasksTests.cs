@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using StreamsForUnity.StreamTasks;
@@ -119,6 +120,53 @@ namespace StreamsForUnity.Tests {
           }).ContinueWith(async () => await StreamTask.Delay(1000));
         }).ContinueWith(async () => await StreamTask.Delay(1000)).ContinueWith(() => tcs.SetResult(true));
       });
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test]
+    public async Task MultipleContinuationsTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      var tasks = new List<StreamTask>(5);
+      SetFailureAfterTime(3, tcs);
+
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
+        StreamTask task = StreamTask.Delay(1000);
+
+        for (var i = 0; i < 5; i++) {
+          int index = i;
+          tasks.Add(task.ContinueWith(() => Debug.Log(index)));
+        }
+
+        await StreamTask.WhenAll(tasks);
+        tcs.SetResult(true);
+      });
+
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test]
+    public async Task MultipleAsyncContinuationsTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      var tasks = new List<StreamTask>(5);
+      SetFailureAfterTime(3, tcs);
+
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
+        StreamTask task = StreamTask.Delay(1000);
+
+        for (var i = 0; i < 5; i++) {
+          int randomTime = Random.Range(100, 1000);
+          Debug.Log($"Unit {i}, time: {randomTime}");
+          int index = i;
+          tasks.Add(task.ContinueWith(async () => {
+            await StreamTask.Delay(randomTime);
+            Debug.Log(index);
+          }));
+        }
+
+        await StreamTask.WhenAll(tasks);
+        tcs.SetResult(true);
+      });
+
       Assert.IsTrue(await tcs.Task);
     }
 
