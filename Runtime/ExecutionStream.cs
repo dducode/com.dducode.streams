@@ -25,15 +25,13 @@ namespace StreamsForUnity {
     private event Action DisposeEvent;
     private event Action DelayedActions;
 
-    private readonly CancellationToken _disposeToken;
     private readonly string _name;
-
-    private CancellationToken _lockToken = CancellationToken.None;
     private float? _streamDeltaTime;
     private float _accumulatedDeltaTime;
+    private bool _lock;
 
     internal ExecutionStream(CancellationToken disposeToken, string name) {
-      _disposeToken = disposeToken;
+      disposeToken.Register(Dispose);
       _name = name;
     }
 
@@ -115,7 +113,8 @@ namespace StreamsForUnity {
     }
 
     public void Lock(CancellationToken lockToken) {
-      _lockToken = lockToken;
+      _lock = true;
+      lockToken.Register(() => _lock = false);
     }
 
     public void OnDispose(Action onDispose) {
@@ -170,6 +169,7 @@ namespace StreamsForUnity {
         case State.Disposed:
           throw new StreamsException("Cannot execute disposed stream");
         case State.Running:
+          StreamState = State.Idle;
           Dispose();
           throw new StreamsException("Recursive execution occurred");
         case State.Idle:
@@ -182,18 +182,10 @@ namespace StreamsForUnity {
     }
 
     private bool CanExecute() {
-      if (_disposeToken.IsCancellationRequested) {
-        Dispose();
-        return false;
-      }
-
       if (_actionsStorage.Count == 0)
         return false;
 
-      if (_lockToken.IsCancellationRequested)
-        _lockToken = CancellationToken.None;
-
-      if (_lockToken != CancellationToken.None)
+      if (_lock)
         return false;
 
       return true;
@@ -225,6 +217,11 @@ namespace StreamsForUnity {
     }
 
     private void Dispose() {
+      if (StreamState == State.Running) {
+        DelayedActions += Dispose;
+        return;
+      }
+
       StreamState = State.Disposing;
       _actionsStorage.Dispose();
       DisposeEvent?.Invoke();

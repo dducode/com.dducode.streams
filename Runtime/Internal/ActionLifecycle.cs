@@ -1,6 +1,6 @@
 namespace StreamsForUnity.Internal {
 
-  internal struct ActionLifecycle {
+  internal class ActionLifecycle {
 
     internal float remainingTime;
 
