@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
@@ -12,45 +13,27 @@ namespace StreamsForUnity.Internal {
     private readonly Queue<StreamAction> _actionsQueueToRemove = new();
 
     // used for optimization
-    private readonly Dictionary<StreamAction, float> _actionTimes = new();
     private IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> _actionsEnumerator;
-    private readonly List<StreamAction> _persistentQueueToUpdate = new();
-    private bool _queueIsDirty;
 
     public void Add(StreamAction action, float time, CancellationToken token) {
       _actions.Add(action, new ActionLifecycle(time));
-      _actionTimes.Add(action, time);
       _actionsEnumerator = _actions.GetEnumerator();
       token.Register(() => _actionsQueueToRemove.Enqueue(action));
-      _queueIsDirty = true;
     }
 
     public void Refresh() {
       RemoveCompletedActions();
-      if (_queueIsDirty)
-        RebuildPersistentQueue();
     }
 
     public void TickTime(float time) {
-      while (_actionsEnumerator.MoveNext()) {
-        StreamAction action = _actionsEnumerator.Current.Key;
-        ActionLifecycle lifecycle = _actionsEnumerator.Current.Value;
+      foreach (KeyValuePair<StreamAction, ActionLifecycle> pair in this) {
+        ActionLifecycle lifecycle = pair.Value;
+        StreamAction action = pair.Key;
 
         lifecycle.remainingTime -= time;
-        _actionTimes[action] = lifecycle.remainingTime;
         if (lifecycle.remainingTime <= 0 && !_actionsQueueToRemove.Contains(action))
           _actionsQueueToRemove.Enqueue(action);
       }
-
-      _actionsEnumerator.Reset();
-    }
-
-    public List<StreamAction> GetActionsToUpdate() {
-      return _persistentQueueToUpdate;
-    }
-
-    public float GetRemainingTime(StreamAction action) {
-      return _actionTimes[action];
     }
 
     public void Remove(StreamAction action) {
@@ -62,33 +45,50 @@ namespace StreamsForUnity.Internal {
       foreach (StreamAction action in _actions.Keys)
         action.Dispose();
       _actions.Clear();
-      _persistentQueueToUpdate.Clear();
+    }
+
+    public Enumerator GetEnumerator() {
+      return new Enumerator(_actionsEnumerator);
     }
 
     private void RemoveCompletedActions() {
-      var refreshEnumerator = false;
+      var invalidEnumerator = false;
 
       while (_actionsQueueToRemove.TryDequeue(out StreamAction action)) {
         if (!action.Executed)
           Debug.LogWarning($"Action {action} has not been executed yet");
 
         _actions.Remove(action);
-        _actionTimes.Remove(action);
-        refreshEnumerator = true;
-        _persistentQueueToUpdate.Remove(action);
+        invalidEnumerator = true;
         action.Dispose();
       }
 
-      if (refreshEnumerator)
+      if (invalidEnumerator)
         _actionsEnumerator = _actions.GetEnumerator();
     }
 
-    private void RebuildPersistentQueue() {
-      _persistentQueueToUpdate.Clear();
-      foreach (StreamAction action in _actions.Keys)
-        _persistentQueueToUpdate.Add(action);
+    public struct Enumerator : IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> {
 
-      _queueIsDirty = false;
+      public KeyValuePair<StreamAction, ActionLifecycle> Current => _other.Current;
+      object IEnumerator.Current => Current;
+      private readonly IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> _other;
+
+      public Enumerator(IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> other) {
+        _other = other;
+      }
+
+      public bool MoveNext() {
+        return _other.MoveNext();
+      }
+
+      public void Reset() {
+        _other.Reset();
+      }
+
+      public void Dispose() {
+        _other.Dispose();
+      }
+
     }
 
   }

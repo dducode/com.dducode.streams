@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using JetBrains.Annotations;
 using StreamsForUnity.Internal;
@@ -198,9 +199,12 @@ namespace StreamsForUnity {
       Streams.PushStream(this);
       Profiler.BeginSample(_name);
 
-      foreach (StreamAction action in _actionsStorage.GetActionsToUpdate()) {
+      foreach (KeyValuePair<StreamAction, ActionLifecycle> pair in _actionsStorage) {
+        StreamAction action = pair.Key;
+        ActionLifecycle lifecycle = pair.Value;
+
         try {
-          action.Invoke(deltaTime, _actionsStorage.GetRemainingTime(action));
+          action.Invoke(deltaTime, lifecycle.remainingTime);
         }
         catch (Exception exception) {
           Debug.LogError($"An error occured while executing action <b>{action}</b>");
