@@ -1,4 +1,3 @@
-using System.Threading;
 using StreamsForUnity.Internal.Extensions;
 using UnityEngine;
 using UnityEngine.Events;
@@ -14,8 +13,8 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
 
     private readonly MonoStreamRunnerFactory _streamRunnerFactory = new();
     private ExecutionStream _stream;
-    private CancellationTokenSource _lockHandle;
-    private CancellationTokenSource _subscriptionHandle;
+    private StreamTokenSource _lockHandle;
+    private StreamTokenSource _subscriptionHandle;
 
     private Transform _transform;
     private GameObject _gameObject;
@@ -34,8 +33,8 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
         _siblingIndex = priority;
       }
 
-      _subscriptionHandle.Cancel();
-      _subscriptionHandle = new CancellationTokenSource();
+      _subscriptionHandle.Release();
+      _subscriptionHandle = new StreamTokenSource();
       _parent = _transform.parent;
       _scene = _gameObject.scene;
       GetBaseStream(_transform.parent).Add(Stream.Update, _subscriptionHandle.Token, priority);
@@ -46,17 +45,17 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
     }
 
     private void OnEnable() {
-      _lockHandle.Cancel();
+      _lockHandle.Release();
       _lockHandle = null;
     }
 
     private void OnDisable() {
-      _lockHandle = new CancellationTokenSource();
+      _lockHandle = new StreamTokenSource();
       Stream.Lock(_lockHandle.Token);
     }
 
     private void OnDestroy() {
-      _subscriptionHandle.Cancel();
+      _subscriptionHandle.Release();
     }
 
     private ExecutionStream CreateStream() {
@@ -67,14 +66,14 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
       _siblingIndex = (uint)_transform.GetSiblingIndex();
 
       var stream = new ExecutionStream(destroyCancellationToken, _gameObject.name);
-      _subscriptionHandle = new CancellationTokenSource();
+      _subscriptionHandle = new StreamTokenSource();
       GetBaseStream(_transform.parent).Add(stream.Update, _subscriptionHandle.Token, _siblingIndex);
       if (predefinedActions != null && predefinedActions.GetPersistentEventCount() > 0)
         stream.Add(predefinedActions.Invoke, destroyCancellationToken);
 
       Streams.Get<TBaseSystem>().Add(AutoReconnect, destroyCancellationToken);
 
-      _lockHandle = new CancellationTokenSource();
+      _lockHandle = new StreamTokenSource();
       stream.Lock(_lockHandle.Token);
       return stream;
     }

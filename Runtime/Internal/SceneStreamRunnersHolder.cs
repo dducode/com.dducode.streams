@@ -10,9 +10,9 @@ namespace StreamsForUnity.Internal {
     private readonly Dictionary<Type, IStreamRunner> _runners = new();
     private readonly CancellationTokenSource _disposeHandle = new();
 
-    internal void AddStreamRunner<TBaseSystem>(StreamRunner<TBaseSystem> runner, CancellationTokenSource disposeHandle) {
+    internal void AddStreamRunner<TBaseSystem>(StreamRunner<TBaseSystem> runner, StreamTokenSource disposeHandle) {
       _runners.Add(typeof(TBaseSystem), runner);
-      _disposeHandle.Token.Register(disposeHandle.Cancel);
+      _disposeHandle.Token.Register(disposeHandle.Release);
     }
 
     internal bool TryGetStream<TBaseSystem>(out ExecutionStream executionStream) {

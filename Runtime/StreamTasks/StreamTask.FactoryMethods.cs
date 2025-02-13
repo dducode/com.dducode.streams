@@ -1,20 +1,19 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using JetBrains.Annotations;
 
 namespace StreamsForUnity.StreamTasks {
 
   public partial class StreamTask {
 
-    public static StreamTask Yield(CancellationToken token = default) {
+    public static StreamTask Yield(StreamToken token = default) {
       var task = new StreamTask();
       GetRunningStream().AddOnce(task.SetResult, token);
       token.Register(task.SetCanceled);
       return task;
     }
 
-    public static StreamTask Delay(int milliseconds, CancellationToken token = default) {
+    public static StreamTask Delay(int milliseconds, StreamToken token = default) {
       switch (milliseconds) {
         case < 0:
           throw new ArgumentOutOfRangeException(nameof(milliseconds));
@@ -28,23 +27,23 @@ namespace StreamsForUnity.StreamTasks {
       return task;
     }
 
-    public static StreamTask WaitWhile([NotNull] Func<bool> condition, CancellationToken token = default) {
+    public static StreamTask WaitWhile([NotNull] Func<bool> condition, StreamToken token = default) {
       if (condition == null)
         throw new ArgumentNullException(nameof(condition));
 
       var task = new StreamTask();
-      var cts = new CancellationTokenSource();
+      var cts = new StreamTokenSource();
       GetRunningStream().Add(_ => {
         if (condition())
           return;
 
         task.SetResult();
-        cts.Cancel();
+        cts.Release();
       }, cts.Token);
 
       token.Register(() => {
         task.SetCanceled();
-        cts.Cancel();
+        cts.Release();
       });
       return task;
     }

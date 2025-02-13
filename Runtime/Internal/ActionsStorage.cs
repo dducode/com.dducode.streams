@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Threading;
 using UnityEngine;
 
 namespace StreamsForUnity.Internal {
@@ -15,7 +14,7 @@ namespace StreamsForUnity.Internal {
     // used for optimization
     private IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> _actionsEnumerator;
 
-    public void Add(StreamAction action, float time, CancellationToken token) {
+    public void Add(StreamAction action, float time, StreamToken token) {
       _actions.Add(action, new ActionLifecycle(time));
       _actionsEnumerator = _actions.GetEnumerator();
       token.Register(() => _actionsQueueToRemove.Enqueue(action));

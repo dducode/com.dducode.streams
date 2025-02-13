@@ -1,4 +1,3 @@
-using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using StreamsForUnity.StreamStateMachine;
@@ -11,7 +10,7 @@ namespace StreamsForUnity.Tests.StateMachineTests {
 
     [Test, Common]
     public async Task OnUpdateStateMachineTest() {
-      var disposeSource = new CancellationTokenSource();
+      var disposeSource = new StreamTokenSource();
 
       var finalState = new FinalState();
       var fsm = new StateMachine<Update.ScriptRunBehaviourUpdate>(disposeSource.Token, new EntryState(), new HelloState(), finalState);
@@ -19,7 +18,7 @@ namespace StreamsForUnity.Tests.StateMachineTests {
 
       while (fsm.CurrentState != finalState)
         await Task.Yield();
-      disposeSource.Cancel();
+      disposeSource.Release();
     }
 
   }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using JetBrains.Annotations;
 
 namespace StreamsForUnity.StreamStateMachine {
@@ -11,10 +10,10 @@ namespace StreamsForUnity.StreamStateMachine {
     public State CurrentState { get; private set; }
 
     private readonly Dictionary<Type, State> _states;
-    private CancellationTokenSource _stateCancelling = new();
+    private StreamTokenSource _stateCancelling = new();
     private bool _entering;
 
-    public StateMachine(CancellationToken disposeToken, [NotNull] params State[] states) {
+    public StateMachine(StreamToken disposeToken, [NotNull] params State[] states) {
       if (states == null)
         throw new ArgumentNullException(nameof(states));
       if (states.Length == 0)
@@ -35,13 +34,13 @@ namespace StreamsForUnity.StreamStateMachine {
     }
 
     private void ExitFromCurrentState() {
-      _stateCancelling.Cancel();
+      _stateCancelling.Release();
       CurrentState?.Exit();
     }
 
     private void EnterToState(State state) {
       CurrentState = state;
-      _stateCancelling = new CancellationTokenSource();
+      _stateCancelling = new StreamTokenSource();
       state.Enter(_stateCancelling.Token);
     }
 

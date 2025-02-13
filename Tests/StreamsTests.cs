@@ -1,4 +1,3 @@
-using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using StreamsForUnity.Tests.Attributes;
@@ -13,10 +12,10 @@ namespace StreamsForUnity.Tests {
     [Test, Common]
     public async Task DeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new CancellationTokenSource();
+      var cts = new StreamTokenSource();
       Streams.Get<Update.ScriptRunBehaviourUpdate>().Add(delta => {
         tcs.SetResult(Mathf.Approximately(delta, Time.deltaTime));
-        cts.Cancel();
+        cts.Release();
       }, cts.Token);
 
       Assert.IsTrue(await tcs.Task);
@@ -25,10 +24,10 @@ namespace StreamsForUnity.Tests {
     [Test, Common]
     public async Task FixedDeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new CancellationTokenSource();
+      var cts = new StreamTokenSource();
       Streams.Get<FixedUpdate.ScriptRunBehaviourFixedUpdate>().Add(delta => {
         tcs.SetResult(Mathf.Approximately(delta, Time.fixedDeltaTime));
-        cts.Cancel();
+        cts.Release();
       }, cts.Token);
 
       Assert.IsTrue(await tcs.Task);
@@ -59,21 +58,21 @@ namespace StreamsForUnity.Tests {
     [Test, Common]
     public async Task ConditionalTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var disposeHandle = new CancellationTokenSource();
+      var disposeHandle = new StreamTokenSource();
 
       Streams.Get<Update.ScriptRunBehaviourUpdate>()
         .AddConditional(() => true, delta => Debug.Log(delta), disposeHandle.Token)
         .SetDelta(0.1f)
         .OnDispose(() => tcs.SetResult(true));
 
-      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddTimer(2, () => disposeHandle.Cancel());
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddTimer(2, () => disposeHandle.Release());
       Assert.IsTrue(await tcs.Task);
     }
 
     [Test, Common]
     public async Task LockStreamTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var lockHandle = new CancellationTokenSource();
+      var lockHandle = new StreamTokenSource();
 
       Streams.Get<Update.ScriptRunBehaviourUpdate>()
         .Add(deltaTime => Debug.Log(deltaTime))
@@ -81,7 +80,7 @@ namespace StreamsForUnity.Tests {
 
       ExecutionStream stream = Streams.Get<FixedUpdate.ScriptRunBehaviourFixedUpdate>();
       stream.AddTimer(2, () => Streams.Get<Update.ScriptRunBehaviourUpdate>().Lock(lockHandle.Token));
-      stream.AddTimer(4, () => lockHandle.Cancel());
+      stream.AddTimer(4, () => lockHandle.Release());
       stream.AddTimer(6, () => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Threading;
 using StreamsForUnity.Internal;
 using StreamsForUnity.StreamRunners;
 using UnityEngine;
@@ -18,7 +17,7 @@ namespace StreamsForUnity {
       if (TryGetStream<TBaseSystem>(scene, out ExecutionStream stream))
         return stream;
 
-      var disposeHandle = new CancellationTokenSource();
+      var disposeHandle = new StreamTokenSource();
       uint priority = SceneManager.GetActiveScene() == scene ? 0 : uint.MaxValue;
       var runner = new StreamRunner<TBaseSystem>(disposeHandle.Token, scene.name, priority);
 
@@ -78,7 +77,7 @@ namespace StreamsForUnity {
       return false;
     }
 
-    private static void RegisterStreamRunner<TBaseSystem>(Scene scene, StreamRunner<TBaseSystem> runner, CancellationTokenSource disposeHandle) {
+    private static void RegisterStreamRunner<TBaseSystem>(Scene scene, StreamRunner<TBaseSystem> runner, StreamTokenSource disposeHandle) {
       if (!_runnersHolders.ContainsKey(scene))
         _runnersHolders.Add(scene, new SceneStreamRunnersHolder());
       _runnersHolders[scene].AddStreamRunner(runner, disposeHandle);

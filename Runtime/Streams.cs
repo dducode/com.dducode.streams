@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using JetBrains.Annotations;
 using StreamsForUnity.Internal;
 using UnityEngine;
@@ -18,7 +17,7 @@ namespace StreamsForUnity {
 
     private static readonly Dictionary<Type, ExecutionStream> _connectedStreams = new();
     private static readonly Stack<ExecutionStream> _streamsStack = new();
-    private static CancellationTokenSource _streamsCancellation = new();
+    private static StreamTokenSource _streamsCancellation = new();
 
     public static ExecutionStream Get<TSystem>() {
 #if UNITY_EDITOR
@@ -38,7 +37,7 @@ namespace StreamsForUnity {
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Initialize() {
-      _streamsCancellation = new CancellationTokenSource();
+      _streamsCancellation = new StreamTokenSource();
       Application.quitting += DisposeAllStreams;
 
       CreateStream<Update.ScriptRunBehaviourUpdate>();
@@ -56,7 +55,7 @@ namespace StreamsForUnity {
     }
 
     private static void DisposeAllStreams() {
-      _streamsCancellation.Cancel();
+      _streamsCancellation.Release();
       _connectedStreams.Clear();
       Application.quitting -= DisposeAllStreams;
     }

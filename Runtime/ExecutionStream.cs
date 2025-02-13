@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using JetBrains.Annotations;
 using StreamsForUnity.Internal;
 using StreamsForUnity.StreamTasks;
@@ -31,12 +30,12 @@ namespace StreamsForUnity {
     private float _accumulatedDeltaTime;
     private bool _lock;
 
-    internal ExecutionStream(CancellationToken disposeToken, string name) {
+    internal ExecutionStream(StreamToken disposeToken, string name) {
       disposeToken.Register(Dispose);
       _name = name;
     }
 
-    public StreamAction Add([NotNull] Action<float> action, CancellationToken token = default, uint priority = uint.MaxValue) {
+    public StreamAction Add([NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(action, priority);
@@ -44,7 +43,7 @@ namespace StreamsForUnity {
       return streamAction;
     }
 
-    public StreamAction AddTemporary(float time, [NotNull] Action<float> action, CancellationToken token = default, uint priority = uint.MaxValue) {
+    public StreamAction AddTemporary(float time, [NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
       if (time <= 0) {
         Debug.LogWarning($"Time is negative or zero: {time}");
         return null;
@@ -58,7 +57,7 @@ namespace StreamsForUnity {
     }
 
     public StreamAction AddConditional(
-      [NotNull] Func<bool> condition, [NotNull] Action<float> action, CancellationToken token = default, uint priority = uint.MaxValue
+      [NotNull] Func<bool> condition, [NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue
     ) {
       ValidateAddAction(action);
       if (condition == null)
@@ -72,7 +71,7 @@ namespace StreamsForUnity {
       return streamAction;
     }
 
-    public StreamAction AddOnce([NotNull] Action action, CancellationToken token = default, uint priority = uint.MaxValue) {
+    public StreamAction AddOnce([NotNull] Action action, StreamToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(_ => action(), priority);
@@ -80,7 +79,7 @@ namespace StreamsForUnity {
       return streamAction;
     }
 
-    public StreamAction AddOnce([NotNull] Func<StreamTask> action, CancellationToken token = default) {
+    public StreamAction AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(_ => action(), uint.MaxValue);
@@ -88,7 +87,7 @@ namespace StreamsForUnity {
       return streamAction;
     }
 
-    public void AddTimer(float time, [NotNull] Action onComplete, CancellationToken token = default) {
+    public void AddTimer(float time, [NotNull] Action onComplete, StreamToken token = default) {
       if (time <= 0) {
         Debug.LogWarning($"Time is negative or zero: {time}");
         return;
@@ -101,7 +100,7 @@ namespace StreamsForUnity {
       streamAction.OnDispose(() => {
         if (StreamState == State.Disposing)
           return;
-        if (token.IsCancellationRequested)
+        if (token.Released)
           return;
         AddOnce(onComplete, token);
       });
@@ -113,7 +112,7 @@ namespace StreamsForUnity {
       _streamDeltaTime = delta;
     }
 
-    public void Lock(CancellationToken lockToken) {
+    public void Lock(StreamToken lockToken) {
       _lock = true;
       lockToken.Register(() => _lock = false);
     }
@@ -152,7 +151,7 @@ namespace StreamsForUnity {
       }
     }
 
-    private void AddAction(StreamAction streamAction, float time, CancellationToken token) {
+    private void AddAction(StreamAction streamAction, float time, StreamToken token) {
       if (StreamState == State.Running) {
         DelayedActions += () => PerformAddAction(streamAction, time, token);
         return;
@@ -161,7 +160,7 @@ namespace StreamsForUnity {
       PerformAddAction(streamAction, time, token);
     }
 
-    private void PerformAddAction(StreamAction streamAction, float time, CancellationToken token) {
+    private void PerformAddAction(StreamAction streamAction, float time, StreamToken token) {
       _actionsStorage.Add(streamAction, time, token);
     }
 
