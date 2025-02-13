@@ -169,7 +169,7 @@ namespace StreamsForUnity {
         case State.Disposed:
           throw new StreamsException("Cannot execute disposed stream");
         case State.Running:
-          StreamState = State.Idle;
+          StreamState = State.Disposing;
           Dispose();
           throw new StreamsException("Recursive execution occurred");
         case State.Idle:

@@ -5,7 +5,7 @@ namespace StreamsForUnity {
 
   public readonly struct StreamToken {
 
-    public bool Released => _source.Released;
+    public bool Released => _source?.Released ?? false;
 
     private readonly StreamTokenSource _source;
 
@@ -14,7 +14,7 @@ namespace StreamsForUnity {
     }
 
     public void Register(Action action) {
-      _source.Register(action);
+      _source?.Register(action);
     }
 
     public static implicit operator StreamToken(CancellationToken cancellationToken) {

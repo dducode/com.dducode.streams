@@ -10,9 +10,7 @@ namespace StreamsForUnity.Internal {
 
     private readonly SortedList<StreamAction, ActionLifecycle> _actions = new(new StreamActionComparer());
     private readonly Queue<StreamAction> _actionsQueueToRemove = new();
-
-    // used for optimization
-    private IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> _actionsEnumerator;
+    private IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> _actionsEnumerator; // used for optimization
 
     public void Add(StreamAction action, float time, StreamToken token) {
       _actions.Add(action, new ActionLifecycle(time));
@@ -66,7 +64,7 @@ namespace StreamsForUnity.Internal {
         _actionsEnumerator = _actions.GetEnumerator();
     }
 
-    public struct Enumerator : IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> {
+    public readonly struct Enumerator : IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> {
 
       public KeyValuePair<StreamAction, ActionLifecycle> Current => _other.Current;
       object IEnumerator.Current => Current;

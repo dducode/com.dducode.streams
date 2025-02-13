@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using UnityEngine;
 
-#if ENABLE_UNITASK_INTEGRATION
+#if STREAMS_UNITASK_INTEGRATION
 using Cysharp.Threading.Tasks;
 #endif
 
@@ -15,7 +15,7 @@ namespace StreamsForUnity.StreamTasks.Extensions {
       return streamTask;
     }
 
-#if ENABLE_UNITASK_INTEGRATION
+#if STREAMS_UNITASK_INTEGRATION
     public static StreamTask ToStreamTask(this UniTask uniTask) {
       var streamTask = new StreamTask();
       uniTask.ContinueWith(streamTask.SetResult);
