@@ -16,12 +16,16 @@ namespace StreamsForUnity {
     }
 
     public void Release() {
+      if (Released)
+        return;
       while (_onReleaseActions.TryDequeue(out Action action))
         action();
       Released = true;
     }
 
     internal void Register([NotNull] Action onReleaseAction) {
+      if (Released)
+        throw new StreamsException("Cannot register action after the token source has been released");
       if (onReleaseAction == null)
         throw new ArgumentNullException(nameof(onReleaseAction));
       _onReleaseActions.Enqueue(onReleaseAction);

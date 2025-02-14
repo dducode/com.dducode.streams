@@ -25,6 +25,7 @@ namespace StreamsForUnity {
     private event Action DelayedActions;
 
     private readonly string _name;
+    private readonly Action _cancelLock;
     private float? _streamDeltaTime;
     private float _accumulatedDeltaTime;
     private bool _lock;
@@ -32,6 +33,7 @@ namespace StreamsForUnity {
     internal ExecutionStream(StreamToken disposeToken, string name) {
       disposeToken.Register(Dispose);
       _name = name;
+      _cancelLock = () => _lock = false;
     }
 
     public StreamAction Add([NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
@@ -113,7 +115,7 @@ namespace StreamsForUnity {
 
     public void Lock(StreamToken lockToken) {
       _lock = true;
-      lockToken.Register(() => _lock = false);
+      lockToken.Register(_cancelLock);
     }
 
     public void OnDispose(Action onDispose) {
@@ -122,6 +124,17 @@ namespace StreamsForUnity {
 
     public override string ToString() {
       return _name;
+    }
+
+    internal void Join(ExecutionStream other) {
+      ExecutionStream runningStream = Streams.RunningStream;
+      if (runningStream == this || runningStream == other)
+        throw new StreamsException($"Cannot join a running stream ({runningStream})");
+
+      _actionsStorage.Join(other._actionsStorage);
+      DelayedActions += other.DelayedActions;
+      DisposeEvent += other.DisposeEvent;
+      other.SilentDispose();
     }
 
     internal void Update(float deltaTime) {
@@ -208,6 +221,12 @@ namespace StreamsForUnity {
       StreamState = State.Disposing;
       _actionsStorage.Dispose();
       DisposeEvent?.Invoke();
+      DisposeEvent = null;
+      StreamState = State.Disposed;
+    }
+
+    private void SilentDispose() {
+      DelayedActions = null;
       DisposeEvent = null;
       StreamState = State.Disposed;
     }

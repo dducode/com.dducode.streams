@@ -1,18 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using StreamsForUnity.StreamRunners;
 
 namespace StreamsForUnity.Internal {
 
-  internal class SceneStreamRunnersHolder {
+  internal sealed class SceneStreamRunnersHolder {
 
     private readonly Dictionary<Type, IStreamRunner> _runners = new();
-    private readonly CancellationTokenSource _disposeHandle = new();
+    private readonly StreamTokenSource _disposeHandle = new();
 
     internal void AddStreamRunner<TBaseSystem>(StreamRunner<TBaseSystem> runner, StreamTokenSource disposeHandle) {
       _runners.Add(typeof(TBaseSystem), runner);
-      _disposeHandle.Token.Register(disposeHandle.Release);
+      _disposeHandle.Register(disposeHandle.Release);
     }
 
     internal bool TryGetStream<TBaseSystem>(out ExecutionStream executionStream) {
@@ -31,7 +30,7 @@ namespace StreamsForUnity.Internal {
     }
 
     internal void DisposeAttachedRunners() {
-      _disposeHandle.Cancel();
+      _disposeHandle.Release();
       _runners.Clear();
     }
 
