@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using JetBrains.Annotations;
 using StreamsForUnity.Internal;
 using StreamsForUnity.StreamTasks;
@@ -38,8 +37,8 @@ namespace StreamsForUnity {
     public StreamAction Add([NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
-      var streamAction = new StreamAction(action, priority);
-      AddAction(streamAction, float.PositiveInfinity, token);
+      var streamAction = new StreamAction(action, float.PositiveInfinity, priority);
+      _actionsStorage.Add(streamAction, token);
       return streamAction;
     }
 
@@ -51,8 +50,8 @@ namespace StreamsForUnity {
 
       ValidateAddAction(action);
 
-      var streamAction = new StreamAction(action, priority);
-      AddAction(streamAction, time, token);
+      var streamAction = new StreamAction(action, time, priority);
+      _actionsStorage.Add(streamAction, token);
       return streamAction;
     }
 
@@ -66,24 +65,24 @@ namespace StreamsForUnity {
       var streamAction = new StreamAction(deltaTime => {
         if (condition())
           action(deltaTime);
-      }, priority);
-      AddAction(streamAction, float.PositiveInfinity, token);
+      }, float.PositiveInfinity, priority);
+      _actionsStorage.Add(streamAction, token);
       return streamAction;
     }
 
     public StreamAction AddOnce([NotNull] Action action, StreamToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
-      var streamAction = new StreamAction(_ => action(), priority);
-      AddAction(streamAction, float.Epsilon, token);
+      var streamAction = new StreamAction(_ => action(), float.Epsilon, priority);
+      _actionsStorage.Add(streamAction, token);
       return streamAction;
     }
 
     public StreamAction AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
-      var streamAction = new StreamAction(_ => action(), uint.MaxValue);
-      AddAction(streamAction, float.Epsilon, token);
+      var streamAction = new StreamAction(_ => action(), float.Epsilon, uint.MaxValue);
+      _actionsStorage.Add(streamAction, token);
       return streamAction;
     }
 
@@ -95,8 +94,8 @@ namespace StreamsForUnity {
 
       ValidateAddAction(onComplete);
 
-      var streamAction = new StreamAction(_ => { }, uint.MaxValue);
-      AddAction(streamAction, time, token);
+      var streamAction = new StreamAction(_ => { }, time, uint.MaxValue);
+      _actionsStorage.Add(streamAction, token);
       streamAction.OnDispose(() => {
         if (StreamState == State.Disposing)
           return;
@@ -127,6 +126,7 @@ namespace StreamsForUnity {
 
     internal void Update(float deltaTime) {
       ValidateExecution();
+      _actionsStorage.Refresh();
       if (!CanExecute())
         return;
 
@@ -149,19 +149,6 @@ namespace StreamsForUnity {
         DelayedActions?.Invoke();
         DelayedActions = null;
       }
-    }
-
-    private void AddAction(StreamAction streamAction, float time, StreamToken token) {
-      if (StreamState == State.Running) {
-        DelayedActions += () => PerformAddAction(streamAction, time, token);
-        return;
-      }
-
-      PerformAddAction(streamAction, time, token);
-    }
-
-    private void PerformAddAction(StreamAction streamAction, float time, StreamToken token) {
-      _actionsStorage.Add(streamAction, time, token);
     }
 
     private void ValidateExecution() {
@@ -192,18 +179,13 @@ namespace StreamsForUnity {
     }
 
     private void Execute(float deltaTime) {
-      _actionsStorage.Refresh();
-
       StreamState = State.Running;
       Streams.PushStream(this);
       Profiler.BeginSample(_name);
 
-      foreach (KeyValuePair<StreamAction, ActionLifecycle> pair in _actionsStorage) {
-        StreamAction action = pair.Key;
-        ActionLifecycle lifecycle = pair.Value;
-
+      foreach (StreamAction action in _actionsStorage) {
         try {
-          action.Invoke(deltaTime, lifecycle.remainingTime);
+          action.Invoke(deltaTime);
         }
         catch (Exception exception) {
           Debug.LogError($"An error occured while executing action <b>{action}</b>");
@@ -215,8 +197,6 @@ namespace StreamsForUnity {
       Profiler.EndSample();
       Streams.PopStream();
       StreamState = State.Idle;
-
-      _actionsStorage.TickTime(deltaTime);
     }
 
     private void Dispose() {

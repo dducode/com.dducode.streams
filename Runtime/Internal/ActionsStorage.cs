@@ -1,6 +1,6 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace StreamsForUnity.Internal {
 
@@ -8,82 +8,80 @@ namespace StreamsForUnity.Internal {
 
     public int Count => _actions.Count;
 
-    private readonly SortedList<StreamAction, ActionLifecycle> _actions = new(new StreamActionComparer());
-    private readonly Queue<StreamAction> _actionsQueueToRemove = new();
-    private IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> _actionsEnumerator; // used for optimization
+    private readonly List<StreamAction> _actions = new(100);
+    private readonly Queue<StreamAction> _pendingAddActions = new(10);
+    private readonly Queue<StreamAction> _pendingRemoveActions = new(10);
+    private readonly StreamActionComparer _comparer = new();
+    private bool _dirty;
 
-    public void Add(StreamAction action, float time, StreamToken token) {
-      _actions.Add(action, new ActionLifecycle(time));
-      _actionsEnumerator = _actions.GetEnumerator();
-      token.Register(() => _actionsQueueToRemove.Enqueue(action));
-    }
+    public void Add(StreamAction action, StreamToken token) {
+      if (!_pendingAddActions.Contains(action))
+        _pendingAddActions.Enqueue(action);
 
-    public void Refresh() {
-      RemoveCompletedActions();
-    }
-
-    public void TickTime(float time) {
-      foreach (KeyValuePair<StreamAction, ActionLifecycle> pair in this) {
-        ActionLifecycle lifecycle = pair.Value;
-        StreamAction action = pair.Key;
-
-        lifecycle.remainingTime -= time;
-        if (lifecycle.remainingTime <= 0 && !_actionsQueueToRemove.Contains(action))
-          _actionsQueueToRemove.Enqueue(action);
-      }
+      Action removeAction = () => Remove(action);
+      action.OnPriorityChanged += () => _dirty = true;
+      action.OnComplete += removeAction;
+      token.Register(removeAction);
     }
 
     public void Remove(StreamAction action) {
-      if (!_actionsQueueToRemove.Contains(action))
-        _actionsQueueToRemove.Enqueue(action);
+      if (!_pendingRemoveActions.Contains(action))
+        _pendingRemoveActions.Enqueue(action);
+    }
+
+    public void Refresh() {
+      ApplyChanges();
+
+      if (_dirty) {
+        _actions.Sort(_comparer);
+        _dirty = false;
+      }
+    }
+
+    public Enumerator GetEnumerator() {
+      return new Enumerator(_actions);
     }
 
     public void Dispose() {
-      foreach (StreamAction action in _actions.Keys)
+      foreach (StreamAction action in _actions)
         action.Dispose();
       _actions.Clear();
     }
 
-    public Enumerator GetEnumerator() {
-      return new Enumerator(_actionsEnumerator);
-    }
-
-    private void RemoveCompletedActions() {
-      var invalidEnumerator = false;
-
-      while (_actionsQueueToRemove.TryDequeue(out StreamAction action)) {
-        if (!action.Executed)
-          Debug.LogWarning($"Action {action} has not been executed yet");
-
-        _actions.Remove(action);
-        invalidEnumerator = true;
-        action.Dispose();
+    private void ApplyChanges() {
+      while (_pendingAddActions.TryDequeue(out StreamAction action)) {
+        _actions.Add(action);
+        _dirty = true;
       }
 
-      if (invalidEnumerator)
-        _actionsEnumerator = _actions.GetEnumerator();
+      while (_pendingRemoveActions.TryDequeue(out StreamAction action)) {
+        action.Dispose();
+        _actions.Remove(action);
+        _dirty = true;
+      }
     }
 
-    public readonly struct Enumerator : IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> {
+    public struct Enumerator : IEnumerator<StreamAction> {
 
-      public KeyValuePair<StreamAction, ActionLifecycle> Current => _other.Current;
+      public StreamAction Current => _list[_index];
       object IEnumerator.Current => Current;
-      private readonly IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> _other;
 
-      public Enumerator(IEnumerator<KeyValuePair<StreamAction, ActionLifecycle>> other) {
-        _other = other;
+      private readonly List<StreamAction> _list;
+      private int _index;
+
+      public Enumerator(List<StreamAction> list) {
+        _list = list;
+        _index = -1;
       }
 
       public bool MoveNext() {
-        return _other.MoveNext();
+        return ++_index < _list.Count;
       }
 
       public void Reset() {
-        _other.Reset();
       }
 
       public void Dispose() {
-        _other.Dispose();
       }
 
     }

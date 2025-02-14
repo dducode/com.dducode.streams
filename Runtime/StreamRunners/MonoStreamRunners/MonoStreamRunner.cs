@@ -13,6 +13,8 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
 
     private readonly MonoStreamRunnerFactory _streamRunnerFactory = new();
     private ExecutionStream _stream;
+    private StreamAction _execution;
+
     private StreamTokenSource _lockHandle;
     private StreamTokenSource _subscriptionHandle;
 
@@ -26,18 +28,14 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
       return _streamRunnerFactory.Create<TRunner>(_transform, streamName).Stream;
     }
 
-    public void ReconnectStream(uint priority) {
+    public void ChangePriority(uint priority) {
       if (_siblingIndex != priority) {
         priority = (uint)Mathf.Clamp(priority, 0, _transform.parent.childCount - 1);
         _transform.SetSiblingIndex((int)priority);
         _siblingIndex = priority;
       }
 
-      _subscriptionHandle.Release();
-      _subscriptionHandle = new StreamTokenSource();
-      _parent = _transform.parent;
-      _scene = _gameObject.scene;
-      GetBaseStream(_transform.parent).Add(Stream.Update, _subscriptionHandle.Token, priority);
+      _execution.ChangePriority(priority);
     }
 
     private void Awake() {
@@ -59,23 +57,33 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
     }
 
     private ExecutionStream CreateStream() {
+      Initialize();
+
+      var stream = new ExecutionStream(destroyCancellationToken, _gameObject.name);
+      SetupStream(stream);
+
+      ExecutionStream rootStream = Streams.Get<TBaseSystem>();
+      rootStream.Add(AutoReconnect, destroyCancellationToken);
+      rootStream.Add(AutoChangePriority, destroyCancellationToken);
+
+      _lockHandle = new StreamTokenSource();
+      stream.Lock(_lockHandle.Token);
+      return stream;
+    }
+
+    private void Initialize() {
       _transform = transform;
       _gameObject = gameObject;
       _parent = _transform.parent;
       _scene = _gameObject.scene;
       _siblingIndex = (uint)_transform.GetSiblingIndex();
+    }
 
-      var stream = new ExecutionStream(destroyCancellationToken, _gameObject.name);
+    private void SetupStream(ExecutionStream stream) {
       _subscriptionHandle = new StreamTokenSource();
-      GetBaseStream(_transform.parent).Add(stream.Update, _subscriptionHandle.Token, _siblingIndex);
+      _execution = GetBaseStream(_transform.parent).Add(stream.Update, _subscriptionHandle.Token, _siblingIndex);
       if (predefinedActions != null && predefinedActions.GetPersistentEventCount() > 0)
         stream.Add(predefinedActions.Invoke, destroyCancellationToken);
-
-      Streams.Get<TBaseSystem>().Add(AutoReconnect, destroyCancellationToken);
-
-      _lockHandle = new StreamTokenSource();
-      stream.Lock(_lockHandle.Token);
-      return stream;
     }
 
     private ExecutionStream GetBaseStream(Transform parent) {
@@ -85,10 +93,26 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
     }
 
     private void AutoReconnect(float _) {
-      if (_transform.GetSiblingIndex() == _siblingIndex && _transform.parent == _parent && _gameObject.scene == _scene)
+      if (_transform.parent == _parent && _gameObject.scene == _scene)
         return;
 
-      ReconnectStream(_siblingIndex = (uint)_transform.GetSiblingIndex());
+      ReconnectStream();
+    }
+
+    private void AutoChangePriority(float _) {
+      if (_siblingIndex == _transform.GetSiblingIndex())
+        return;
+
+      ChangePriority(_siblingIndex = (uint)_transform.GetSiblingIndex());
+    }
+
+    private void ReconnectStream() {
+      _subscriptionHandle.Release();
+      _subscriptionHandle = new StreamTokenSource();
+      _parent = _transform.parent;
+      _scene = _gameObject.scene;
+      _siblingIndex = (uint)transform.GetSiblingIndex();
+      _execution = GetBaseStream(_transform.parent).Add(Stream.Update, _subscriptionHandle.Token, _siblingIndex);
     }
 
   }

@@ -27,7 +27,7 @@ namespace StreamsForUnity.Internal {
 
     internal void ReorderRunners(uint priority) {
       foreach (IStreamRunner runner in _runners.Values)
-        runner.ReconnectStream(priority);
+        runner.ChangePriority(priority);
     }
 
     internal void DisposeAttachedRunners() {

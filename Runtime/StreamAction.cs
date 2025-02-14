@@ -14,9 +14,11 @@ namespace StreamsForUnity {
       }
     }
 
-    internal bool Executed { get; private set; }
-    internal uint Priority { get; }
+    internal float RemainingTime { get; private set; }
+    internal uint Priority { get; private set; }
     internal Guid Id { get; } = Guid.NewGuid();
+    internal event Action OnPriorityChanged;
+    internal event Action OnComplete;
 
     private event Action DisposeEvent;
     private readonly Action<float> _action;
@@ -24,8 +26,9 @@ namespace StreamsForUnity {
     private float _accumulatedDeltaTime;
     private string _name = nameof(StreamAction);
 
-    internal StreamAction(Action<float> action, uint priority) {
+    internal StreamAction(Action<float> action, float time, uint priority) {
       _action = action;
+      RemainingTime = time;
       Priority = priority;
     }
 
@@ -41,19 +44,30 @@ namespace StreamsForUnity {
       return this;
     }
 
-    internal void Invoke(float deltaTime, float remainingTime) {
+    internal void ChangePriority(uint priority) {
+      Priority = priority;
+      OnPriorityChanged?.Invoke();
+    }
+
+    internal void Invoke(float deltaTime) {
+      if (RemainingTime <= 0) {
+        OnComplete?.Invoke();
+        OnComplete = null;
+        return;
+      }
+
       if (!_actionDeltaTime.HasValue) {
         try {
           _action.Invoke(deltaTime);
         }
         finally {
-          Executed = true;
+          RemainingTime -= deltaTime;
         }
 
         return;
       }
 
-      _accumulatedDeltaTime += Math.Min(deltaTime, remainingTime);
+      _accumulatedDeltaTime += Math.Min(deltaTime, RemainingTime);
       if (_accumulatedDeltaTime < _actionDeltaTime.Value)
         return;
 
@@ -63,7 +77,7 @@ namespace StreamsForUnity {
         }
         finally {
           _accumulatedDeltaTime -= _actionDeltaTime.Value;
-          Executed = true;
+          RemainingTime -= _actionDeltaTime.Value;
         }
       }
     }
