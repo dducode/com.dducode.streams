@@ -6,15 +6,15 @@ namespace StreamsForUnity.StreamStateMachine {
   public abstract class State {
 
     protected IStateMachine StateMachine { get; private set; }
-    protected ExecutionStream Stream => _runner.Stream;
+    protected ExecutionStream Stream => _holder.Stream;
 
     private StreamTokenSource _lockHandle = new();
-    private IStreamRunner _runner;
+    private IStreamHolder _holder;
 
     internal void Initialize<TBaseSystem>(IStateMachine stateMachine, StreamToken disposeToken) {
       StateMachine = stateMachine;
-      _runner = new StreamRunner<TBaseSystem>(disposeToken, NamesUtility.CreateProfilerSampleName(GetType()));
-      _runner.Stream.Lock(_lockHandle.Token);
+      _holder = new StreamHolder<TBaseSystem>(disposeToken, NamesUtility.CreateProfilerSampleName(GetType()));
+      _holder.Stream.Lock(_lockHandle.Token);
       OnInitialize();
     }
 
@@ -26,7 +26,7 @@ namespace StreamsForUnity.StreamStateMachine {
 
     internal void Exit() {
       _lockHandle = new StreamTokenSource();
-      _runner.Stream.Lock(_lockHandle.Token);
+      _holder.Stream.Lock(_lockHandle.Token);
       OnExit();
     }
 

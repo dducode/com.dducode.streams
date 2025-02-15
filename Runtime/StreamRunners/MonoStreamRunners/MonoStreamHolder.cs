@@ -6,13 +6,13 @@ using UnityEngine.SceneManagement;
 namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
 
   [DisallowMultipleComponent]
-  public abstract class MonoStreamRunner<TBaseSystem> : MonoBehaviour, IStreamRunner {
+  public abstract class MonoStreamHolder<TBaseSystem> : MonoBehaviour, IStreamHolder {
 
     [SerializeField] private UnityEvent<float> predefinedActions;
     public ExecutionStream Stream => _stream ??= CreateStream();
     public uint Priority { get; private set; }
 
-    private readonly MonoStreamRunnerFactory _streamRunnerFactory = new();
+    private readonly MonoStreamHolderFactory _streamHolderFactory = new();
     private ExecutionStream _stream;
     private StreamAction _execution;
 
@@ -24,8 +24,8 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
     private Transform _parent;
     private Scene _scene;
 
-    public ExecutionStream CreateNested<TRunner>(string streamName = "StreamRunner") where TRunner : MonoBehaviour, IStreamRunner {
-      return _streamRunnerFactory.Create<TRunner>(_transform, streamName).Stream;
+    public ExecutionStream CreateNested<TRunner>(string streamName = "StreamRunner") where TRunner : MonoBehaviour, IStreamHolder {
+      return _streamHolderFactory.Create<TRunner>(_transform, streamName).Stream;
     }
 
     public void ChangePriority(uint priority) {
@@ -38,7 +38,7 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
       _execution.ChangePriority(priority);
     }
 
-    public IStreamRunner Join(IStreamRunner other) {
+    public IStreamHolder Join(IStreamHolder other) {
       if (other.Priority < Priority)
         return other.Join(this);
 
@@ -51,12 +51,12 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
       DestroyImmediate(_gameObject);
     }
 
-    private void Awake() {
+    private void Start() {
       _stream ??= CreateStream();
     }
 
     private void OnEnable() {
-      _lockHandle.Release();
+      _lockHandle?.Release();
       _lockHandle = null;
     }
 
@@ -79,8 +79,6 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
       rootStream.Add(AutoReconnect, destroyCancellationToken);
       rootStream.Add(AutoChangePriority, destroyCancellationToken);
 
-      _lockHandle = new StreamTokenSource();
-      stream.Lock(_lockHandle.Token);
       return stream;
     }
 
@@ -100,7 +98,7 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
     }
 
     private ExecutionStream GetBaseStream(Transform parent) {
-      if (parent != null && parent.TryGetComponentInParent(out MonoStreamRunner<TBaseSystem> runner))
+      if (parent != null && parent.TryGetComponentInParent(out MonoStreamHolder<TBaseSystem> runner))
         return runner.Stream;
       return _gameObject.scene.GetStream<TBaseSystem>();
     }

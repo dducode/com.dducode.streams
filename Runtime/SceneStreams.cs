@@ -8,8 +8,8 @@ namespace StreamsForUnity {
 
   public static class SceneStreams {
 
-    private static readonly Dictionary<Scene, SceneStreamRunnersHolder> _runnersHolders = new();
-    private static readonly MonoStreamRunnerFactory _streamRunnerFactory = new();
+    private static readonly Dictionary<Scene, SceneStreamsHolder> _runnersHolders = new();
+    private static readonly MonoStreamHolderFactory _streamHolderFactory = new();
 
     public static ExecutionStream GetStream<TBaseSystem>(this Scene scene) {
       if (!scene.IsValid())
@@ -19,15 +19,15 @@ namespace StreamsForUnity {
 
       var disposeHandle = new StreamTokenSource();
       uint priority = SceneManager.GetActiveScene() == scene ? 0 : uint.MaxValue;
-      var runner = new StreamRunner<TBaseSystem>(disposeHandle.Token, scene.name, priority);
+      var runner = new StreamHolder<TBaseSystem>(disposeHandle.Token, scene.name, priority);
 
       RegisterStreamRunner(scene, runner, disposeHandle);
       return runner.Stream;
     }
 
     public static ExecutionStream CreateNested<TRunner>(this Scene scene, string streamName = "StreamRunner")
-      where TRunner : MonoBehaviour, IStreamRunner {
-      return _streamRunnerFactory.Create<TRunner>(scene, streamName).Stream;
+      where TRunner : MonoBehaviour, IStreamHolder {
+      return _streamHolderFactory.Create<TRunner>(scene, streamName).Stream;
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -38,10 +38,10 @@ namespace StreamsForUnity {
     }
 
     private static void DisposeAttachedStreamsOnSceneUnloaded(Scene scene) {
-      if (!_runnersHolders.TryGetValue(scene, out SceneStreamRunnersHolder holder))
+      if (!_runnersHolders.TryGetValue(scene, out SceneStreamsHolder holder))
         return;
 
-      holder.DisposeAttachedRunners();
+      holder.DisposeAttachedHolders();
       _runnersHolders.Remove(scene);
     }
 
@@ -49,15 +49,15 @@ namespace StreamsForUnity {
       if (current.buildIndex == -1) // on startup the current scene index is -1
         return;
 
-      if (_runnersHolders.TryGetValue(current, out SceneStreamRunnersHolder firstHolder))
-        firstHolder.ReorderRunners(uint.MaxValue);
-      if (_runnersHolders.TryGetValue(next, out SceneStreamRunnersHolder secondHolder))
-        secondHolder.ReorderRunners(0);
+      if (_runnersHolders.TryGetValue(current, out SceneStreamsHolder firstHolder))
+        firstHolder.ReorderHolders(uint.MaxValue);
+      if (_runnersHolders.TryGetValue(next, out SceneStreamsHolder secondHolder))
+        secondHolder.ReorderHolders(0);
     }
 
     private static void DisposeAllRunners() {
-      foreach (SceneStreamRunnersHolder holder in _runnersHolders.Values)
-        holder.DisposeAttachedRunners();
+      foreach (SceneStreamsHolder holder in _runnersHolders.Values)
+        holder.DisposeAttachedHolders();
       _runnersHolders.Clear();
 
       SceneManager.sceneUnloaded -= DisposeAttachedStreamsOnSceneUnloaded;
@@ -66,7 +66,7 @@ namespace StreamsForUnity {
     }
 
     private static bool TryGetStream<TBaseSystem>(Scene scene, out ExecutionStream executionStream) {
-      if (_runnersHolders.TryGetValue(scene, out SceneStreamRunnersHolder holder)) {
+      if (_runnersHolders.TryGetValue(scene, out SceneStreamsHolder holder)) {
         if (holder.TryGetStream<TBaseSystem>(out ExecutionStream stream)) {
           executionStream = stream;
           return true;
@@ -77,10 +77,10 @@ namespace StreamsForUnity {
       return false;
     }
 
-    private static void RegisterStreamRunner<TBaseSystem>(Scene scene, StreamRunner<TBaseSystem> runner, StreamTokenSource disposeHandle) {
+    private static void RegisterStreamRunner<TBaseSystem>(Scene scene, StreamHolder<TBaseSystem> holder, StreamTokenSource disposeHandle) {
       if (!_runnersHolders.ContainsKey(scene))
-        _runnersHolders.Add(scene, new SceneStreamRunnersHolder());
-      _runnersHolders[scene].AddStreamRunner(runner, disposeHandle);
+        _runnersHolders.Add(scene, new SceneStreamsHolder());
+      _runnersHolders[scene].AddStreamHolder(holder, disposeHandle);
     }
 
   }

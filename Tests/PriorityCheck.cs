@@ -5,8 +5,8 @@ namespace StreamsForUnity.Tests {
 
   public class PriorityCheck : MonoBehaviour {
 
-    public void CheckStreamPriority(UpdateStreamRunner runner) {
-      Debug.Log(runner.name);
+    public void CheckStreamPriority(UpdateStreamHolder holder) {
+      Debug.Log(holder.name);
     }
 
   }

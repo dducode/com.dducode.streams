@@ -1,6 +1,6 @@
 namespace StreamsForUnity.StreamRunners {
 
-  public sealed class StreamRunner<TBaseSystem> : IStreamRunner {
+  public sealed class StreamHolder<TBaseSystem> : IStreamHolder {
 
     public ExecutionStream Stream {
       get {
@@ -25,7 +25,7 @@ namespace StreamsForUnity.StreamRunners {
     private StreamTokenSource _subscriptionHandle;
     private bool _disposed;
 
-    public StreamRunner(StreamToken disposeToken, string name, uint priority = uint.MaxValue) {
+    public StreamHolder(StreamToken disposeToken, string name, uint priority = uint.MaxValue) {
       Stream = new ExecutionStream(disposeToken, name);
       _subscriptionHandle = new StreamTokenSource();
       disposeToken.Register(Dispose);
@@ -39,7 +39,7 @@ namespace StreamsForUnity.StreamRunners {
       Priority = priority;
     }
 
-    public IStreamRunner Join(IStreamRunner other) {
+    public IStreamHolder Join(IStreamHolder other) {
       ValidateRunnerState();
       if (other.Priority < Priority)
         return other.Join(this);

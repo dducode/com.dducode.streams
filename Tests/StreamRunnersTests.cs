@@ -9,8 +9,8 @@ namespace StreamsForUnity.Tests {
     [Test]
     public async Task MonoStreamRunnerTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var factory = new MonoStreamRunnerFactory();
-      var runner = factory.Create<UpdateStreamRunner>();
+      var factory = new MonoStreamHolderFactory();
+      var runner = factory.Create<UpdateStreamHolder>();
       runner.Stream.AddOnce(() => tcs.SetResult(true));
       Assert.IsTrue(await tcs.Task);
     }

@@ -1,11 +1,11 @@
 namespace StreamsForUnity.StreamRunners {
 
-  public interface IStreamRunner {
+  public interface IStreamHolder {
 
     public ExecutionStream Stream { get; }
     uint Priority { get; }
     public void ChangePriority(uint priority);
-    public IStreamRunner Join(IStreamRunner other);
+    public IStreamHolder Join(IStreamHolder other);
     public void Dispose();
 
   }
