@@ -40,9 +40,9 @@ namespace StreamsForUnity {
       _streamsCancellation = new StreamTokenSource();
       Application.quitting += DisposeAllStreams;
 
-      CreateStream<Update.ScriptRunBehaviourUpdate>();
-      CreateStream<FixedUpdate.ScriptRunBehaviourFixedUpdate>();
-      CreateStream<PreLateUpdate.ScriptRunBehaviourLateUpdate>();
+      CreateStream<Update>();
+      CreateStream<FixedUpdate>();
+      CreateStream<PreLateUpdate>();
     }
 
     private static ExecutionStream CreateStream<TSystem>() {

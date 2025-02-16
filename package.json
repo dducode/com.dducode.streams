@@ -6,5 +6,8 @@
   "author": {
     "name": "dducode",
     "email": "dducode98@gmail.com"
+  },
+  "dependencies": {
+    "com.unity.test-framework.performance" : "3.0.3"
   }
 }

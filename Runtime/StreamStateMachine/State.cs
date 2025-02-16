@@ -1,5 +1,5 @@
 using StreamsForUnity.Internal;
-using StreamsForUnity.StreamRunners;
+using StreamsForUnity.StreamHolders;
 
 namespace StreamsForUnity.StreamStateMachine {
 

@@ -1,4 +1,4 @@
-namespace StreamsForUnity.StreamRunners {
+namespace StreamsForUnity.StreamHolders {
 
   public sealed class StreamHolder<TBaseSystem> : IStreamHolder {
 

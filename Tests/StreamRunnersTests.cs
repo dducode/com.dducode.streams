@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using NUnit.Framework;
-using StreamsForUnity.StreamRunners.MonoStreamRunners;
+using StreamsForUnity.StreamHolders.MonoStreamHolders;
 
 namespace StreamsForUnity.Tests {
 

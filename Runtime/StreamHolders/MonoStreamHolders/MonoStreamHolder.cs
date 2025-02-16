@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 
-namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
+namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
 
   [DisallowMultipleComponent]
   public abstract class MonoStreamHolder<TBaseSystem> : MonoBehaviour, IStreamHolder {

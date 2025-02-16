@@ -13,7 +13,7 @@ namespace StreamsForUnity.Tests {
     public async Task DeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
       var cts = new StreamTokenSource();
-      Streams.Get<Update.ScriptRunBehaviourUpdate>().Add(delta => {
+      Streams.Get<Update>().Add(delta => {
         tcs.SetResult(Mathf.Approximately(delta, Time.deltaTime));
         cts.Release();
       }, cts.Token);
@@ -25,7 +25,7 @@ namespace StreamsForUnity.Tests {
     public async Task FixedDeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
       var cts = new StreamTokenSource();
-      Streams.Get<FixedUpdate.ScriptRunBehaviourFixedUpdate>().Add(delta => {
+      Streams.Get<FixedUpdate>().Add(delta => {
         tcs.SetResult(Mathf.Approximately(delta, Time.fixedDeltaTime));
         cts.Release();
       }, cts.Token);
@@ -37,7 +37,7 @@ namespace StreamsForUnity.Tests {
     public async Task TemporaryUpdateTest() {
       var tcs = new TaskCompletionSource<bool>();
 
-      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddTemporary(2, delta => {
+      Streams.Get<Update>().AddTemporary(2, delta => {
         Debug.Log(delta);
       }).SetDelta(0.5f).OnDispose(() => tcs.SetResult(true));
 
@@ -48,7 +48,7 @@ namespace StreamsForUnity.Tests {
     public async Task FixedUpdateTest() {
       var tcs = new TaskCompletionSource<bool>();
 
-      Streams.Get<FixedUpdate.ScriptRunBehaviourFixedUpdate>().AddTemporary(0.2f, delta => {
+      Streams.Get<FixedUpdate>().AddTemporary(0.2f, delta => {
         Debug.Log(delta);
       }).SetDelta(0.002f).OnDispose(() => tcs.SetResult(true));
 
@@ -60,12 +60,12 @@ namespace StreamsForUnity.Tests {
       var tcs = new TaskCompletionSource<bool>();
       var disposeHandle = new StreamTokenSource();
 
-      Streams.Get<Update.ScriptRunBehaviourUpdate>()
+      Streams.Get<Update>()
         .AddConditional(() => true, delta => Debug.Log(delta), disposeHandle.Token)
         .SetDelta(0.1f)
         .OnDispose(() => tcs.SetResult(true));
 
-      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddTimer(2, () => disposeHandle.Release());
+      Streams.Get<Update>().AddTimer(2, () => disposeHandle.Release());
       Assert.IsTrue(await tcs.Task);
     }
 
@@ -74,12 +74,12 @@ namespace StreamsForUnity.Tests {
       var tcs = new TaskCompletionSource<bool>();
       var lockHandle = new StreamTokenSource();
 
-      Streams.Get<Update.ScriptRunBehaviourUpdate>()
+      Streams.Get<Update>()
         .Add(deltaTime => Debug.Log(deltaTime))
         .SetDelta(0.1f);
 
-      ExecutionStream stream = Streams.Get<FixedUpdate.ScriptRunBehaviourFixedUpdate>();
-      stream.AddTimer(2, () => Streams.Get<Update.ScriptRunBehaviourUpdate>().Lock(lockHandle.Token));
+      ExecutionStream stream = Streams.Get<FixedUpdate>();
+      stream.AddTimer(2, () => Streams.Get<Update>().Lock(lockHandle.Token));
       stream.AddTimer(4, () => lockHandle.Release());
       stream.AddTimer(6, () => tcs.SetResult(true));
 
@@ -90,14 +90,14 @@ namespace StreamsForUnity.Tests {
     public async Task SceneStreamTest() {
       var tcs = new TaskCompletionSource<bool>();
       Scene scene = SceneManager.CreateScene("Test");
-      scene.GetStream<Update.ScriptRunBehaviourUpdate>().AddOnce(() => tcs.SetResult(true));
+      scene.GetStream<Update>().AddOnce(() => tcs.SetResult(true));
       Assert.IsTrue(await tcs.Task);
     }
 
     [Test, Common]
     public async Task ActionsChainTest() {
       var tcs = new TaskCompletionSource<bool>();
-      ExecutionStream stream = Streams.Get<Update.ScriptRunBehaviourUpdate>();
+      ExecutionStream stream = Streams.Get<Update>();
       stream.AddOnce(() => {
         Debug.Log(1);
         stream.AddOnce(() => {
@@ -114,7 +114,7 @@ namespace StreamsForUnity.Tests {
     [Test, Common]
     public async Task PriorityActionsTest() {
       var tcs = new TaskCompletionSource<bool>();
-      ExecutionStream stream = Streams.Get<Update.ScriptRunBehaviourUpdate>();
+      ExecutionStream stream = Streams.Get<Update>();
       stream.AddOnce(() => {
         Debug.Log(5);
         tcs.SetResult(true);

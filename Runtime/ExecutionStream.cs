@@ -27,6 +27,7 @@ namespace StreamsForUnity {
     private event Action DelayedActions;
 
     private readonly string _name;
+    private readonly string _profilerName;
     private float? _streamDeltaTime;
     private float _accumulatedDeltaTime;
     private bool _lock;
@@ -34,6 +35,7 @@ namespace StreamsForUnity {
     internal ExecutionStream(StreamToken disposeToken, string name) {
       disposeToken.Register(Dispose);
       _name = name;
+      _profilerName = $"{_name} (stream)";
     }
 
     public StreamAction Add([NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
@@ -202,7 +204,7 @@ namespace StreamsForUnity {
     private void Execute(float deltaTime) {
       StreamState = State.Running;
       Streams.PushStream(this);
-      Profiler.BeginSample(_name);
+      Profiler.BeginSample(_profilerName);
 
       for (var i = 0; i < _actionsStorage.Count; i++)
         HandleAction(deltaTime, _actionsStorage, i);

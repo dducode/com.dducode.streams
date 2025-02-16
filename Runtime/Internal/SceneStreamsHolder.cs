@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using StreamsForUnity.StreamRunners;
+using StreamsForUnity.StreamHolders;
 
 namespace StreamsForUnity.Internal {
 
