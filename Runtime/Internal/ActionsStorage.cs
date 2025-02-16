@@ -18,6 +18,11 @@ namespace StreamsForUnity.Internal {
     private readonly StreamActionComparer _comparer = new();
 
     public void Add(StreamAction action, StreamToken token) {
+      if (token.Released) {
+        action.Dispose();
+        return;
+      }
+
       if (!_pendingAddActions.Contains(action))
         _pendingAddActions.Enqueue(action);
 
@@ -29,8 +34,7 @@ namespace StreamsForUnity.Internal {
     }
 
     public void Remove(StreamAction action) {
-      if (!_pendingRemoveActions.Contains(action))
-        _pendingRemoveActions.Enqueue(action);
+      _pendingRemoveActions.Enqueue(action);
     }
 
     public void Refresh() {

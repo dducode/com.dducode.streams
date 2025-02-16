@@ -115,7 +115,10 @@ namespace StreamsForUnity.Tests {
     public async Task PriorityActionsTest() {
       var tcs = new TaskCompletionSource<bool>();
       ExecutionStream stream = Streams.Get<Update.ScriptRunBehaviourUpdate>();
-      stream.AddOnce(() => Debug.Log(5), priority: 5).OnDispose(() => tcs.SetResult(true));
+      stream.AddOnce(() => {
+        Debug.Log(5);
+        tcs.SetResult(true);
+      }, priority: 5);
       stream.AddOnce(() => Debug.Log(1), priority: 1);
       stream.AddOnce(() => Debug.Log(4), priority: 4);
       stream.AddOnce(() => Debug.Log(2), priority: 2);

@@ -54,6 +54,11 @@ namespace StreamsForUnity.StreamTasks {
       return nextTask;
     }
 
+    public StreamTask WithCancellation(StreamToken token) {
+      token.Register(SetCanceled);
+      return this;
+    }
+
     internal void SetResult() {
       Complete();
     }
@@ -62,14 +67,18 @@ namespace StreamsForUnity.StreamTasks {
       Complete(new OperationCanceledException());
     }
 
+    internal void SetException([NotNull] Exception exception) {
+      if (exception == null)
+        throw new ArgumentNullException(nameof(exception));
+      Complete(exception);
+    }
+
     private void Complete(Exception error = null) {
       if (IsCompleted)
         return;
 
       IsCompleted = true;
       Error = error;
-      if (Error != null)
-        return;
 
       while (_continuations.TryDequeue(out Action continuation))
         continuation();

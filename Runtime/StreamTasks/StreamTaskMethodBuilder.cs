@@ -47,7 +47,7 @@ namespace StreamsForUnity.StreamTasks {
     }
 
     public void SetException(Exception exception) {
-      Debug.LogError("An error occurred while executing async method");
+      Debug.LogError("Unhandled error was occurred");
       Debug.LogException(exception);
     }
 

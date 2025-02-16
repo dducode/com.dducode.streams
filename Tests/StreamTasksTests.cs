@@ -1,10 +1,13 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using StreamsForUnity.StreamTasks;
+using StreamsForUnity.StreamTasks.Extensions;
 using StreamsForUnity.Tests.Attributes;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
+using Random = UnityEngine.Random;
 
 namespace StreamsForUnity.Tests {
 
@@ -165,6 +168,80 @@ namespace StreamsForUnity.Tests {
         }
 
         await StreamTask.WhenAll(tasks);
+        tcs.SetResult(true);
+      });
+
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test, StreamTasks]
+    public async Task ImmediateCancellationTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      var sts = new StreamTokenSource();
+      SetFailureAfterTime(2, tcs);
+
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
+        try {
+          sts.Release();
+          await StreamTask.Delay(1000, sts.Token);
+          tcs.SetResult(false);
+        }
+        catch (OperationCanceledException) {
+          tcs.SetResult(true);
+        }
+      });
+
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test, StreamTasks]
+    public async Task DelayedCancellationTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      var sts = new StreamTokenSource();
+      SetFailureAfterTime(2, tcs);
+
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
+        try {
+          await StreamTask.Delay(1000, sts.Token);
+          tcs.SetResult(false);
+        }
+        catch (OperationCanceledException) {
+          tcs.SetResult(true);
+        }
+      });
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddTimer(0.5f, () => sts.Release());
+
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test, StreamTasks]
+    public async Task ErrorInsideAsyncMethodTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      SetFailureAfterTime(2, tcs);
+
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
+        try {
+          await Task.Delay(500);
+          await StreamTask.Delay(500);
+          tcs.SetResult(false);
+        }
+        catch (StreamsException exception) {
+          Debug.Log($"StreamsException was thrown; message: <b>{exception.Message}</b>");
+          tcs.SetResult(true);
+        }
+      });
+
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test, StreamTasks]
+    public async Task ToStreamTaskTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      SetFailureAfterTime(2, tcs);
+
+      Streams.Get<Update.ScriptRunBehaviourUpdate>().AddOnce(async () => {
+        await Task.Delay(500).ToStreamTask();
+        await StreamTask.Delay(500);
         tcs.SetResult(true);
       });
 

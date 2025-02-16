@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
+using StreamsForUnity.StreamTasks.Internal;
 
 namespace StreamsForUnity.StreamTasks {
 
@@ -8,7 +9,7 @@ namespace StreamsForUnity.StreamTasks {
 
     public static StreamTask Yield(StreamToken token = default) {
       var task = new StreamTask();
-      GetRunningStream().AddOnce(task.SetResult, token);
+      StreamTaskHelper.GetRunningStream().AddOnce(task.SetResult, token);
       token.Register(task.SetCanceled);
       return task;
     }
@@ -22,7 +23,7 @@ namespace StreamsForUnity.StreamTasks {
       }
 
       var task = new StreamTask();
-      GetRunningStream().AddTimer(milliseconds / 1000f, task.SetResult, token);
+      StreamTaskHelper.GetRunningStream().AddTimer(milliseconds / 1000f, task.SetResult, token);
       token.Register(task.SetCanceled);
       return task;
     }
@@ -33,7 +34,7 @@ namespace StreamsForUnity.StreamTasks {
 
       var task = new StreamTask();
       var cts = new StreamTokenSource();
-      GetRunningStream().Add(_ => {
+      StreamTaskHelper.GetRunningStream().Add(_ => {
         if (condition())
           return;
 
@@ -87,10 +88,6 @@ namespace StreamsForUnity.StreamTasks {
       foreach (StreamTask otherTask in tasks)
         otherTask.ContinueWith(continuation);
       return task;
-    }
-
-    private static ExecutionStream GetRunningStream() {
-      return Streams.RunningStream ?? throw new StreamsException("Cannot use stream tasks outside of stream execution");
     }
 
   }

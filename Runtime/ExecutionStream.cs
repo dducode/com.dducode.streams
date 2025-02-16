@@ -25,7 +25,6 @@ namespace StreamsForUnity {
     private event Action DelayedActions;
 
     private readonly string _name;
-    private readonly Action _cancelLock;
     private float? _streamDeltaTime;
     private float _accumulatedDeltaTime;
     private bool _lock;
@@ -33,7 +32,6 @@ namespace StreamsForUnity {
     internal ExecutionStream(StreamToken disposeToken, string name) {
       disposeToken.Register(Dispose);
       _name = name;
-      _cancelLock = () => _lock = false;
     }
 
     public StreamAction Add([NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
@@ -72,20 +70,18 @@ namespace StreamsForUnity {
       return streamAction;
     }
 
-    public StreamAction AddOnce([NotNull] Action action, StreamToken token = default, uint priority = uint.MaxValue) {
+    public void AddOnce([NotNull] Action action, StreamToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(_ => action(), float.Epsilon, priority);
       _actionsStorage.Add(streamAction, token);
-      return streamAction;
     }
 
-    public StreamAction AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
+    public void AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(_ => action(), float.Epsilon, uint.MaxValue);
       _actionsStorage.Add(streamAction, token);
-      return streamAction;
     }
 
     public void AddTimer(float time, [NotNull] Action onComplete, StreamToken token = default) {
@@ -115,7 +111,7 @@ namespace StreamsForUnity {
 
     public void Lock(StreamToken lockToken) {
       _lock = true;
-      lockToken.Register(_cancelLock);
+      lockToken.Register(() => _lock = false);
     }
 
     public void OnDispose(Action onDispose) {

@@ -25,7 +25,7 @@ namespace StreamsForUnity {
 
     internal void Register([NotNull] Action onReleaseAction) {
       if (Released)
-        throw new StreamsException("Cannot register action after the token source has been released");
+        throw new StreamsException("Internal error was occurred - cannot register action after the token source has been released");
       if (onReleaseAction == null)
         throw new ArgumentNullException(nameof(onReleaseAction));
       _onReleaseActions.Enqueue(onReleaseAction);

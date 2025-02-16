@@ -5,8 +5,8 @@ namespace StreamsForUnity {
 
   public class StreamAction {
 
-    private static ulong NextId => _nextId++;
-    private static ulong _nextId;
+    private static int NextId => ++_nextId;
+    private static int _nextId = -1;
 
     public string Name {
       get => _name;
@@ -19,7 +19,7 @@ namespace StreamsForUnity {
 
     internal float RemainingTime { get; private set; }
     internal uint Priority { get; private set; }
-    internal ulong Id { get; } = NextId;
+    internal int Id { get; } = NextId;
     internal event Action OnPriorityChanged;
     internal event Action OnComplete;
 

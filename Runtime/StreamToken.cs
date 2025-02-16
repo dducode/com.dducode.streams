@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using JetBrains.Annotations;
 
 namespace StreamsForUnity {
 
@@ -13,7 +14,15 @@ namespace StreamsForUnity {
       _source = source;
     }
 
-    public void Register(Action action) {
+    public void Register([NotNull] Action action) {
+      if (action == null)
+        throw new ArgumentNullException(nameof(action));
+
+      if (Released) {
+        action();
+        return;
+      }
+
       _source?.Register(action);
     }
 
