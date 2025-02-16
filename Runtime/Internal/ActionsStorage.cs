@@ -4,9 +4,10 @@ using System.Collections.Generic;
 
 namespace StreamsForUnity.Internal {
 
-  internal sealed class ActionsStorage {
+  internal sealed class ActionsStorage : IEnumerable<StreamAction> {
 
     public int Count => _actions.Count;
+    public StreamAction this[int index] => _actions[index];
 
     private readonly List<StreamAction> _actions = new();
     private readonly Dictionary<StreamAction, StreamToken> _tokens = new();
@@ -55,6 +56,14 @@ namespace StreamsForUnity.Internal {
 
     public Enumerator GetEnumerator() {
       return new Enumerator(_actions);
+    }
+
+    IEnumerator<StreamAction> IEnumerable<StreamAction>.GetEnumerator() {
+      return GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator() {
+      return GetEnumerator();
     }
 
     public void Dispose() {

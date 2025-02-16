@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using JetBrains.Annotations;
 using StreamsForUnity.Internal;
 using StreamsForUnity.StreamTasks;
@@ -21,6 +22,7 @@ namespace StreamsForUnity {
     public State StreamState { get; private set; }
 
     private readonly ActionsStorage _actionsStorage = new();
+    private readonly ActionsStorage _parallelActionsStorage = new();
     private event Action DisposeEvent;
     private event Action DelayedActions;
 
@@ -39,6 +41,14 @@ namespace StreamsForUnity {
 
       var streamAction = new StreamAction(action, float.PositiveInfinity, priority);
       _actionsStorage.Add(streamAction, token);
+      return streamAction;
+    }
+
+    public StreamAction AddParallel([NotNull] Action<float> action, StreamToken token = default) {
+      ValidateAddAction(action);
+
+      var streamAction = new StreamAction(action, float.PositiveInfinity, uint.MaxValue);
+      _parallelActionsStorage.Add(streamAction, token);
       return streamAction;
     }
 
@@ -128,6 +138,7 @@ namespace StreamsForUnity {
         throw new StreamsException($"Cannot join a running stream ({runningStream})");
 
       _actionsStorage.Join(other._actionsStorage);
+      _parallelActionsStorage.Join(other._parallelActionsStorage);
       DelayedActions += other.DelayedActions;
       DisposeEvent += other.DisposeEvent;
       other.SilentDispose();
@@ -136,6 +147,7 @@ namespace StreamsForUnity {
     internal void Update(float deltaTime) {
       ValidateExecution();
       _actionsStorage.Refresh();
+      _parallelActionsStorage.Refresh();
       if (!CanExecute())
         return;
 
@@ -178,7 +190,7 @@ namespace StreamsForUnity {
     }
 
     private bool CanExecute() {
-      if (_actionsStorage.Count == 0)
+      if (_actionsStorage.Count == 0 && _parallelActionsStorage.Count == 0)
         return false;
 
       if (_lock)
@@ -192,20 +204,30 @@ namespace StreamsForUnity {
       Streams.PushStream(this);
       Profiler.BeginSample(_name);
 
-      foreach (StreamAction action in _actionsStorage) {
-        try {
-          action.Invoke(deltaTime);
-        }
-        catch (Exception exception) {
-          Debug.LogError($"An error occured while executing action <b>{action}</b>");
-          Debug.LogException(exception);
-          _actionsStorage.Remove(action);
-        }
+      for (var i = 0; i < _actionsStorage.Count; i++)
+        HandleAction(deltaTime, _actionsStorage, i);
+
+      if (_parallelActionsStorage.Count > 0) {
+        float localDelta = deltaTime; // used to avoid closure object allocations
+        Parallel.For(0, _parallelActionsStorage.Count, i => HandleAction(localDelta, _parallelActionsStorage, i));
       }
 
       Profiler.EndSample();
       Streams.PopStream();
       StreamState = State.Idle;
+    }
+
+    private void HandleAction(float deltaTime, ActionsStorage storage, int index) {
+      StreamAction action = storage[index];
+
+      try {
+        action.Invoke(deltaTime);
+      }
+      catch (Exception exception) {
+        Debug.LogError($"An error occured while executing action <b>{action}</b>");
+        Debug.LogException(exception);
+        storage.Remove(action);
+      }
     }
 
     private void Dispose() {
@@ -216,6 +238,7 @@ namespace StreamsForUnity {
 
       StreamState = State.Disposing;
       _actionsStorage.Dispose();
+      _parallelActionsStorage.Dispose();
       DisposeEvent?.Invoke();
       DisposeEvent = null;
       StreamState = State.Disposed;
