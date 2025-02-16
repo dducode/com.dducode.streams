@@ -18,6 +18,7 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
 
     private StreamTokenSource _lockHandle;
     private StreamTokenSource _subscriptionHandle;
+    private StreamTokenSource _destroyHandle;
 
     private Transform _transform;
     private GameObject _gameObject;
@@ -67,18 +68,17 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
 
     private void OnDestroy() {
       _subscriptionHandle.Release();
+      _destroyHandle.Release();
     }
 
     private ExecutionStream CreateStream() {
       Initialize();
 
-      var stream = new ExecutionStream(destroyCancellationToken, _gameObject.name);
+      _destroyHandle = new StreamTokenSource();
+      var stream = new ExecutionStream(_destroyHandle.Token, _gameObject.name);
       SetupStream(stream);
 
-      ExecutionStream rootStream = Streams.Get<TBaseSystem>();
-      rootStream.Add(AutoReconnect, destroyCancellationToken);
-      rootStream.Add(AutoChangePriority, destroyCancellationToken);
-
+      Streams.Get<TBaseSystem>().Add(AutoReconnect, _destroyHandle.Token);
       return stream;
     }
 
@@ -104,17 +104,10 @@ namespace StreamsForUnity.StreamRunners.MonoStreamRunners {
     }
 
     private void AutoReconnect(float _) {
-      if (_transform.parent == _parent && _gameObject.scene == _scene)
-        return;
-
-      ReconnectStream();
-    }
-
-    private void AutoChangePriority(float _) {
-      if (Priority == _transform.GetSiblingIndex())
-        return;
-
-      ChangePriority(Priority = (uint)_transform.GetSiblingIndex());
+      if (_transform.parent != _parent || _gameObject.scene != _scene)
+        ReconnectStream();
+      if (Priority != _transform.GetSiblingIndex())
+        ChangePriority(Priority = (uint)_transform.GetSiblingIndex());
     }
 
     private void ReconnectStream() {

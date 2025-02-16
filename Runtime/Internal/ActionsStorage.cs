@@ -8,11 +8,11 @@ namespace StreamsForUnity.Internal {
 
     public int Count => _actions.Count;
 
-    private readonly List<StreamAction> _actions = new(100);
+    private readonly List<StreamAction> _actions = new();
     private readonly Dictionary<StreamAction, StreamToken> _tokens = new();
 
-    private readonly Queue<StreamAction> _pendingAddActions = new(10);
-    private readonly Queue<StreamAction> _pendingRemoveActions = new(10);
+    private readonly Queue<StreamAction> _pendingAddActions = new();
+    private readonly Queue<StreamAction> _pendingRemoveActions = new();
     private bool _dirty;
 
     private readonly StreamActionComparer _comparer = new();
