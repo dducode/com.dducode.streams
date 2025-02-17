@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using JetBrains.Annotations;
 using StreamsForUnity.Internal;
 using StreamsForUnity.StreamTasks;
@@ -23,6 +22,7 @@ namespace StreamsForUnity {
 
     private readonly ActionsStorage _actionsStorage = new();
     private readonly ActionsStorage _parallelActionsStorage = new();
+    private readonly ParallelActionsWorker _worker = new();
     private event Action DisposeEvent;
     private event Action DelayedActions;
 
@@ -206,13 +206,15 @@ namespace StreamsForUnity {
       Streams.PushStream(this);
       Profiler.BeginSample(_profilerName);
 
+      if (_parallelActionsStorage.Count > 0) {
+        float localDelta = deltaTime;
+        _worker.Start(_parallelActionsStorage.Count, i => HandleAction(localDelta, _parallelActionsStorage, i));
+      }
+
       for (var i = 0; i < _actionsStorage.Count; i++)
         HandleAction(deltaTime, _actionsStorage, i);
 
-      if (_parallelActionsStorage.Count > 0) {
-        float localDelta = deltaTime; // used to avoid closure object allocations
-        Parallel.For(0, _parallelActionsStorage.Count, i => HandleAction(localDelta, _parallelActionsStorage, i));
-      }
+      _worker.Wait();
 
       Profiler.EndSample();
       Streams.PopStream();
