@@ -18,7 +18,7 @@ namespace StreamsForUnity.Internal {
       var nextItem = 0;
       int workersCount = Environment.ProcessorCount;
 
-      WaitCallback work = _ => {
+      Action work = () => {
         int index;
         while ((index = Interlocked.Increment(ref nextItem) - 1) < iterations)
           body(index);
@@ -30,7 +30,7 @@ namespace StreamsForUnity.Internal {
       int schedulerWorkersCount = workersCount;
 
       for (var i = 0; i < schedulerWorkersCount; i++)
-        ThreadPool.QueueUserWorkItem(work);
+        FixedThreadPool.QueueWorkItem(work);
     }
 
     public void Wait() {
