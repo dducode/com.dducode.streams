@@ -1,56 +1,63 @@
 using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 using Unity.PerformanceTesting;
 using UnityEngine;
+using Random = System.Random;
 
 namespace StreamsForUnity.Tests {
 
   public class PerformanceTests {
 
-    private static readonly bool[] _parallel = { true, false };
+    public enum ExecutionType {
+
+      Sequential,
+      Parallel
+
+    }
+
+    private static readonly ExecutionType[] _executionType = { ExecutionType.Sequential, ExecutionType.Parallel };
 
     [Test, Performance]
     public void ManyStreamsTest() {
       var sts = new StreamTokenSource();
-      var holders = new List<ExecutionStream>(1000);
+      var baseStream = new ExecutionStream(sts.Token, "base");
 
       for (var i = 0; i < 1000; i++) {
         var stream = new ExecutionStream(sts.Token, $"Stream {i}");
+        baseStream.Add(stream.Update);
         stream.Add(_ => { });
-        holders.Add(stream);
       }
 
-      Measure.Method(UpdateStream)
+      Measure.Method(() => baseStream.Update(Time.deltaTime))
         .WarmupCount(5)
         .MeasurementCount(60)
         .Run();
 
       sts.Release();
-      return;
-
-      void UpdateStream() {
-        foreach (ExecutionStream stream in holders) 
-          stream.Update(Time.deltaTime);
-      }
     }
 
     [Test, Performance]
-    public void ManyActionsTest([ValueSource(nameof(_parallel))] bool parallel) {
+    public void ManyActionsTest([ValueSource(nameof(_executionType))] ExecutionType executionType) {
       var sts = new StreamTokenSource();
       var stream = new ExecutionStream(sts.Token, "Stream");
 
-      Action<float> action = _ => {
-        var num = 2;
+      Action<float> work = _ => {
+        Matrix4x4 matrix = GetRandomMatrix();
         for (var j = 0; j < 1000; j++)
-          num += num;
+          matrix *= matrix;
       };
 
-      for (var i = 0; i < 1000; i++) {
-        if (parallel)
-          stream.AddParallel(action);
-        else
-          stream.Add(action);
+      for (var i = 0; i < 100; i++) {
+        switch (executionType) {
+          case ExecutionType.Parallel:
+            stream.AddParallel(work);
+            break;
+          case ExecutionType.Sequential:
+            stream.Add(work);
+            break;
+          default:
+            throw new ArgumentOutOfRangeException(nameof(executionType), executionType, null);
+        }
       }
 
       Measure.Method(() => stream.Update(Time.deltaTime))
@@ -59,6 +66,21 @@ namespace StreamsForUnity.Tests {
         .Run();
 
       sts.Release();
+    }
+
+    private static readonly Random _random = new();
+
+    private static Matrix4x4 GetRandomMatrix() {
+      return new Matrix4x4(
+        GetRandomVector4(),
+        GetRandomVector4(),
+        GetRandomVector4(),
+        GetRandomVector4()
+      );
+    }
+
+    private static Vector4 GetRandomVector4() {
+      return new Vector4(_random.Next(0, 1), _random.Next(0, 1), _random.Next(0, 1), _random.Next(0, 1));
     }
 
   }

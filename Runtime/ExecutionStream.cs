@@ -19,6 +19,7 @@ namespace StreamsForUnity {
     }
 
     public State StreamState { get; private set; }
+    public bool IsParallel { get; internal set; }
 
     private readonly ActionsStorage _actionsStorage = new();
     private readonly ActionsStorage _parallelActionsStorage = new();
@@ -176,15 +177,13 @@ namespace StreamsForUnity {
 
     private void ValidateExecution() {
       switch (StreamState) {
-        case State.Disposed:
+        case State.Disposing or State.Disposed:
           throw new StreamsException("Cannot execute disposed stream");
         case State.Running:
           StreamState = State.Disposing;
           Dispose();
           throw new StreamsException("Recursive execution occurred");
         case State.Idle:
-          break;
-        case State.Disposing:
           break;
         default:
           throw new ArgumentOutOfRangeException();
@@ -207,7 +206,7 @@ namespace StreamsForUnity {
       Profiler.BeginSample(_profilerName);
 
       if (_parallelActionsStorage.Count > 0) {
-        float localDelta = deltaTime;
+        float localDelta = deltaTime; // it's used to avoid closure-object allocation
         _worker.Start(_parallelActionsStorage.Count, i => HandleAction(localDelta, _parallelActionsStorage, i));
       }
 

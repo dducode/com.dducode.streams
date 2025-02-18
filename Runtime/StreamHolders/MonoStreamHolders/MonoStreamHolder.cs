@@ -8,14 +8,46 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
   [DisallowMultipleComponent]
   public abstract class MonoStreamHolder<TBaseSystem> : MonoBehaviour, IStreamHolder {
 
+    [SerializeField] private bool streamIsParallel;
     [SerializeField] private UnityEvent<float> predefinedActions;
+
     public ExecutionStream Stream => _stream ??= CreateStream();
-    public uint Priority { get; private set; }
+
+    public bool IsParallel {
+      get => _isParallel;
+      set {
+        if (_isParallel == value)
+          return;
+
+        streamIsParallel = _isParallel = value;
+        if (_stream != null)
+          ReconnectStream();
+      }
+    }
+
+    public uint Priority {
+      get => _priority;
+      set {
+        if (_isParallel) {
+          Debug.LogWarning("Priority has no effect if the stream is registered for parallel execution");
+          _priority = value;
+          return;
+        }
+
+        if (_priority == value)
+          return;
+
+        if (_execution != null)
+          ChangePriority(value);
+      }
+    }
 
     private readonly MonoStreamHolderFactory _streamHolderFactory = new();
     private ExecutionStream _stream;
-    private StreamAction _execution;
+    private uint _priority;
+    private bool _isParallel;
 
+    private StreamAction _execution;
     private StreamTokenSource _lockHandle;
     private StreamTokenSource _subscriptionHandle;
     private StreamTokenSource _destroyHandle;
@@ -25,18 +57,8 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     private Transform _parent;
     private Scene _scene;
 
-    public ExecutionStream CreateNested<TRunner>(string streamName = "StreamRunner") where TRunner : MonoBehaviour, IStreamHolder {
-      return _streamHolderFactory.Create<TRunner>(_transform, streamName).Stream;
-    }
-
-    public void ChangePriority(uint priority) {
-      if (Priority != priority) {
-        priority = (uint)Mathf.Clamp(priority, 0, _transform.parent.childCount - 1);
-        _transform.SetSiblingIndex((int)priority);
-        Priority = priority;
-      }
-
-      _execution.ChangePriority(priority);
+    public ExecutionStream CreateNested<THolder>(string streamName = "StreamHolder") where THolder : MonoStreamHolder<TBaseSystem> {
+      return _streamHolderFactory.Create<THolder>(_transform, streamName).Stream;
     }
 
     public IStreamHolder Join(IStreamHolder other) {
@@ -87,12 +109,16 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
       _gameObject = gameObject;
       _parent = _transform.parent;
       _scene = _gameObject.scene;
-      Priority = (uint)_transform.GetSiblingIndex();
+      _isParallel = streamIsParallel;
+      _priority = (uint)_transform.GetSiblingIndex();
     }
 
     private void SetupStream(ExecutionStream stream) {
       _subscriptionHandle = new StreamTokenSource();
-      _execution = GetBaseStream(_transform.parent).Add(stream.Update, _subscriptionHandle.Token, Priority);
+      _execution = _isParallel
+        ? GetBaseStream(_transform.parent).AddParallel(stream.Update, _subscriptionHandle.Token)
+        : GetBaseStream(_transform.parent).Add(stream.Update, _subscriptionHandle.Token, _priority);
+
       if (predefinedActions != null && predefinedActions.GetPersistentEventCount() > 0)
         stream.Add(predefinedActions.Invoke, destroyCancellationToken);
     }
@@ -104,10 +130,10 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     }
 
     private void AutoReconnect(float _) {
-      if (_transform.parent != _parent || _gameObject.scene != _scene)
+      if (_isParallel != streamIsParallel || _transform.parent != _parent || _gameObject.scene != _scene)
         ReconnectStream();
-      if (Priority != _transform.GetSiblingIndex())
-        ChangePriority(Priority = (uint)_transform.GetSiblingIndex());
+      if (!_isParallel && _priority != _transform.GetSiblingIndex())
+        ChangePriority(_priority = (uint)_transform.GetSiblingIndex());
     }
 
     private void ReconnectStream() {
@@ -115,8 +141,25 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
       _subscriptionHandle = new StreamTokenSource();
       _parent = _transform.parent;
       _scene = _gameObject.scene;
-      Priority = (uint)transform.GetSiblingIndex();
-      _execution = GetBaseStream(_transform.parent).Add(Stream.Update, _subscriptionHandle.Token, Priority);
+      _stream.IsParallel = _isParallel = streamIsParallel;
+
+      if (_isParallel) {
+        _execution = GetBaseStream(_transform.parent).AddParallel(_stream.Update, _subscriptionHandle.Token);
+      }
+      else {
+        _priority = (uint)transform.GetSiblingIndex();
+        _execution = GetBaseStream(_transform.parent).Add(_stream.Update, _subscriptionHandle.Token, _priority);
+      }
+    }
+
+    private void ChangePriority(uint priority) {
+      if (_priority != priority) {
+        priority = (uint)Mathf.Clamp(priority, 0, _transform.parent.childCount - 1);
+        _transform.SetSiblingIndex((int)priority);
+        _priority = priority;
+      }
+
+      _execution.ChangePriority(priority);
     }
 
   }

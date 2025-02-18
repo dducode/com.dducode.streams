@@ -4,7 +4,7 @@ using JetBrains.Annotations;
 
 namespace StreamsForUnity.Internal {
 
-  public class ParallelActionsWorker {
+  internal class ParallelActionsWorker {
 
     private readonly ManualResetEventSlim _workEvent = new(true);
 

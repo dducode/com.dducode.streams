@@ -8,7 +8,7 @@ namespace StreamsForUnity {
 
   public static class SceneStreams {
 
-    private static readonly Dictionary<Scene, SceneStreamsHolder> _runnersHolders = new();
+    private static readonly Dictionary<Scene, SceneStreamsHolder> _streamsHolders = new();
     private static readonly MonoStreamHolderFactory _streamHolderFactory = new();
 
     public static ExecutionStream GetStream<TBaseSystem>(this Scene scene) {
@@ -25,9 +25,9 @@ namespace StreamsForUnity {
       return runner.Stream;
     }
 
-    public static ExecutionStream CreateNested<TRunner>(this Scene scene, string streamName = "StreamRunner")
-      where TRunner : MonoBehaviour, IStreamHolder {
-      return _streamHolderFactory.Create<TRunner>(scene, streamName).Stream;
+    public static ExecutionStream CreateNestedStream<THolder>(this Scene scene, string streamName = "StreamHolder")
+      where THolder : MonoBehaviour, IStreamHolder {
+      return _streamHolderFactory.Create<THolder>(scene, streamName).Stream;
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -38,27 +38,27 @@ namespace StreamsForUnity {
     }
 
     private static void DisposeAttachedStreamsOnSceneUnloaded(Scene scene) {
-      if (!_runnersHolders.TryGetValue(scene, out SceneStreamsHolder holder))
+      if (!_streamsHolders.TryGetValue(scene, out SceneStreamsHolder holder))
         return;
 
       holder.DisposeAttachedHolders();
-      _runnersHolders.Remove(scene);
+      _streamsHolders.Remove(scene);
     }
 
     private static void ReorderStreams(Scene current, Scene next) {
       if (current.buildIndex == -1) // on startup the current scene index is -1
         return;
 
-      if (_runnersHolders.TryGetValue(current, out SceneStreamsHolder firstHolder))
+      if (_streamsHolders.TryGetValue(current, out SceneStreamsHolder firstHolder))
         firstHolder.ReorderHolders(uint.MaxValue);
-      if (_runnersHolders.TryGetValue(next, out SceneStreamsHolder secondHolder))
+      if (_streamsHolders.TryGetValue(next, out SceneStreamsHolder secondHolder))
         secondHolder.ReorderHolders(0);
     }
 
     private static void DisposeAllRunners() {
-      foreach (SceneStreamsHolder holder in _runnersHolders.Values)
+      foreach (SceneStreamsHolder holder in _streamsHolders.Values)
         holder.DisposeAttachedHolders();
-      _runnersHolders.Clear();
+      _streamsHolders.Clear();
 
       SceneManager.sceneUnloaded -= DisposeAttachedStreamsOnSceneUnloaded;
       SceneManager.activeSceneChanged -= ReorderStreams;
@@ -66,7 +66,7 @@ namespace StreamsForUnity {
     }
 
     private static bool TryGetStream<TBaseSystem>(Scene scene, out ExecutionStream executionStream) {
-      if (_runnersHolders.TryGetValue(scene, out SceneStreamsHolder holder)) {
+      if (_streamsHolders.TryGetValue(scene, out SceneStreamsHolder holder)) {
         if (holder.TryGetStream<TBaseSystem>(out ExecutionStream stream)) {
           executionStream = stream;
           return true;
@@ -78,9 +78,9 @@ namespace StreamsForUnity {
     }
 
     private static void RegisterStreamRunner<TBaseSystem>(Scene scene, StreamHolder<TBaseSystem> holder, StreamTokenSource disposeHandle) {
-      if (!_runnersHolders.ContainsKey(scene))
-        _runnersHolders.Add(scene, new SceneStreamsHolder());
-      _runnersHolders[scene].AddStreamHolder(holder, disposeHandle);
+      if (!_streamsHolders.ContainsKey(scene))
+        _streamsHolders.Add(scene, new SceneStreamsHolder());
+      _streamsHolders[scene].AddStreamHolder(holder, disposeHandle);
     }
 
   }
