@@ -10,13 +10,13 @@ namespace StreamsForUnity.Internal {
 
     private static readonly Thread[] _threads;
     private static readonly object _lock;
-    private static readonly Queue<Action> _tasks;
+    private static readonly Queue<WorkSet> _workSets;
     private static bool _isRunning;
 
     static FixedThreadPool() {
       _threads = new Thread[Environment.ProcessorCount];
       _lock = new object();
-      _tasks = new Queue<Action>();
+      _workSets = new Queue<WorkSet>();
       _isRunning = true;
 
       for (var i = 0; i < _threads.Length; i++) {
@@ -27,12 +27,14 @@ namespace StreamsForUnity.Internal {
       Application.quitting += Shutdown;
     }
 
-    public static void QueueWorkItem([NotNull] Action action) {
-      if (action == null)
-        throw new ArgumentNullException(nameof(action));
+    public static void QueueWorkItem([NotNull] Action<WorkerState> task, [NotNull] WorkerState state) {
+      if (task == null)
+        throw new ArgumentNullException(nameof(task));
+      if (state == null)
+        throw new ArgumentNullException(nameof(state));
 
       lock (_lock) {
-        _tasks.Enqueue(action);
+        _workSets.Enqueue(new WorkSet(task, state));
         Monitor.Pulse(_lock);
       }
     }
@@ -49,20 +51,32 @@ namespace StreamsForUnity.Internal {
 
     private static void ThreadFunction() {
       while (true) {
-        Action task;
+        WorkSet set;
 
         lock (_lock) {
-          while (_tasks.Count == 0 && _isRunning)
+          while (_workSets.Count == 0 && _isRunning)
             Monitor.Wait(_lock);
 
-          if (!_isRunning && _tasks.Count == 0)
+          if (!_isRunning && _workSets.Count == 0)
             return;
 
-          task = _tasks.Dequeue();
+          set = _workSets.Dequeue();
         }
 
-        task.Invoke();
+        set.Task.Invoke(set.State);
       }
+    }
+
+    private readonly struct WorkSet {
+
+      public readonly Action<WorkerState> Task;
+      public readonly WorkerState State;
+
+      public WorkSet(Action<WorkerState> task, WorkerState state) {
+        Task = task;
+        State = state;
+      }
+
     }
 
   }

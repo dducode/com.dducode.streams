@@ -7,30 +7,39 @@ namespace StreamsForUnity.Internal {
   internal class ParallelActionsWorker {
 
     private readonly ManualResetEventSlim _workEvent = new(true);
+    private readonly WorkerState _state = new();
+    private readonly Action<WorkerState> _work;
 
-    public void Start(int iterations, [NotNull] Action<int> body) {
+    public ParallelActionsWorker() {
+      _work = state => {
+        int index;
+        while ((index = Interlocked.Increment(ref state.nextItem) - 1) < state.iterations)
+          state.body(state.deltaTime, index);
+
+        if (Interlocked.Decrement(ref state.workersCount) == 0)
+          state.workEvent.Set();
+      };
+    }
+
+    public void Start(float deltaTime, int iterations, [NotNull] Action<float, int> body) {
       if (body == null)
         throw new ArgumentNullException(nameof(body));
       if (!_workEvent.IsSet)
         throw new StreamsException("Previous work is still running");
 
+      int workersCount = Math.Min(iterations, Environment.ProcessorCount);
+
+      _state.iterations = iterations;
+      _state.deltaTime = deltaTime;
+      _state.nextItem = 0;
+      _state.body = body;
+      _state.workersCount = workersCount;
+      _state.workEvent = _workEvent;
+
       _workEvent.Reset();
-      var nextItem = 0;
-      int workersCount = Environment.ProcessorCount;
 
-      Action work = () => {
-        int index;
-        while ((index = Interlocked.Increment(ref nextItem) - 1) < iterations)
-          body(index);
-
-        if (Interlocked.Decrement(ref workersCount) == 0)
-          _workEvent.Set();
-      };
-
-      int schedulerWorkersCount = workersCount;
-
-      for (var i = 0; i < schedulerWorkersCount; i++)
-        FixedThreadPool.QueueWorkItem(work);
+      for (var i = 0; i < workersCount; i++)
+        FixedThreadPool.QueueWorkItem(_work, _state);
     }
 
     public void Wait() {

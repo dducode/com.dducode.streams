@@ -19,11 +19,11 @@ namespace StreamsForUnity {
     }
 
     public State StreamState { get; private set; }
-    public bool IsParallel { get; internal set; }
 
     private readonly ActionsStorage _actionsStorage = new();
     private readonly ActionsStorage _parallelActionsStorage = new();
     private readonly ParallelActionsWorker _worker = new();
+    private readonly Action<float, int> _handleParallelAction;
     private event Action DisposeEvent;
     private event Action DelayedActions;
 
@@ -37,6 +37,7 @@ namespace StreamsForUnity {
       disposeToken.Register(Dispose);
       _name = name;
       _profilerName = $"{_name} (stream)";
+      _handleParallelAction = HandleParallelAction;
     }
 
     public StreamAction Add([NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
@@ -205,10 +206,8 @@ namespace StreamsForUnity {
       Streams.PushStream(this);
       Profiler.BeginSample(_profilerName);
 
-      if (_parallelActionsStorage.Count > 0) {
-        float localDelta = deltaTime; // it's used to avoid closure-object allocation
-        _worker.Start(_parallelActionsStorage.Count, i => HandleAction(localDelta, _parallelActionsStorage, i));
-      }
+      if (_parallelActionsStorage.Count > 0)
+        _worker.Start(deltaTime, _parallelActionsStorage.Count, _handleParallelAction);
 
       for (var i = 0; i < _actionsStorage.Count; i++)
         HandleAction(deltaTime, _actionsStorage, i);
@@ -218,6 +217,10 @@ namespace StreamsForUnity {
       Profiler.EndSample();
       Streams.PopStream();
       StreamState = State.Idle;
+    }
+
+    private void HandleParallelAction(float deltaTime, int index) {
+      HandleAction(deltaTime, _parallelActionsStorage, index);
     }
 
     private void HandleAction(float deltaTime, ActionsStorage storage, int index) {
