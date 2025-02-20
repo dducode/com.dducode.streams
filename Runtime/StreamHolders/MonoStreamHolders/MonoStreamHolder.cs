@@ -23,6 +23,18 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
       }
     }
 
+    public float Delta {
+      get => _delta;
+      set {
+        if (value < 0f)
+          throw new StreamsException("Delta cannot be negative");
+        if (Mathf.Approximately(_delta, value))
+          return;
+
+        _execution.SetDelta(_delta = value);
+      }
+    }
+
     private readonly MonoStreamHolderFactory _streamHolderFactory = new();
     private ExecutionStream _stream;
     private uint _priority;
@@ -36,6 +48,7 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     private GameObject _gameObject;
     private Transform _parent;
     private Scene _scene;
+    private float _delta;
 
     public ExecutionStream CreateNested<THolder>(string streamName = "StreamHolder") where THolder : MonoStreamHolder<TBaseSystem> {
       return _streamHolderFactory.Create<THolder>(_transform, streamName).Stream;

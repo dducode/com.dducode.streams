@@ -18,8 +18,9 @@ namespace StreamsForUnity {
         return stream;
 
       var disposeHandle = new StreamTokenSource();
-      uint priority = SceneManager.GetActiveScene() == scene ? 0 : uint.MaxValue;
-      var runner = new StreamHolder<TBaseSystem>(disposeHandle.Token, scene.name, priority);
+      var runner = new StreamHolder<TBaseSystem>(disposeHandle.Token, scene.name) {
+        Priority = SceneManager.GetActiveScene() == scene ? 0 : uint.MaxValue
+      };
 
       RegisterStreamRunner(scene, runner, disposeHandle);
       return runner.Stream;

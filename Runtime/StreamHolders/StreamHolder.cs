@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace StreamsForUnity.StreamHolders {
 
   public sealed class StreamHolder<TBaseSystem> : IStreamHolder {
@@ -24,19 +26,37 @@ namespace StreamsForUnity.StreamHolders {
       }
     }
 
+    public float Delta {
+      get {
+        ValidateHolderState();
+        return _delta;
+      }
+      set {
+        ValidateHolderState();
+        if (value < 0f)
+          throw new StreamsException("Delta cannot be negative");
+        if (Mathf.Approximately(_delta, value))
+          return;
+
+        _execution.SetDelta(_delta = value);
+      }
+    }
+
     private ExecutionStream _stream;
     private uint _priority;
+    private float _delta;
 
     private StreamAction _execution;
     private StreamTokenSource _subscriptionHandle;
     private bool _disposed;
 
-    public StreamHolder(StreamToken disposeToken, string name, uint priority = uint.MaxValue) {
+    public StreamHolder(StreamToken disposeToken, string name) {
       Stream = new ExecutionStream(disposeToken, name);
       _subscriptionHandle = new StreamTokenSource();
       disposeToken.Register(Dispose);
-      _execution = Streams.Get<TBaseSystem>().Add(Stream.Update, _subscriptionHandle.Token, priority);
-      _priority = priority;
+      _execution = Streams.Get<TBaseSystem>().Add(Stream.Update, _subscriptionHandle.Token);
+      _priority = uint.MaxValue;
+      _delta = -1;
     }
 
     public IStreamHolder Join(IStreamHolder other) {

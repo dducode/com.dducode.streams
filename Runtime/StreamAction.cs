@@ -1,5 +1,6 @@
 using System;
 using JetBrains.Annotations;
+using UnityEngine;
 
 namespace StreamsForUnity {
 
@@ -20,6 +21,7 @@ namespace StreamsForUnity {
     internal float RemainingTime { get; private set; }
     internal uint Priority { get; private set; }
     internal int Id { get; } = NextId;
+
     internal event Action OnPriorityChanged;
     internal event Action OnComplete;
 
@@ -27,6 +29,10 @@ namespace StreamsForUnity {
     private readonly Action<float> _action;
     private float? _actionDeltaTime;
     private float _accumulatedDeltaTime;
+
+    private float[] _lods;
+    private int _lodIndex;
+
     private string _name = nameof(StreamAction);
 
     internal StreamAction(Action<float> action, float time, uint priority) {
@@ -39,6 +45,44 @@ namespace StreamsForUnity {
       if (delta <= 0)
         throw new ArgumentOutOfRangeException(nameof(delta));
       _actionDeltaTime = delta;
+      return this;
+    }
+
+    public StreamAction SetupLevelsOfDetails(params float[] lods) {
+      for (var i = 0; i < lods.Length; i++) {
+        if (lods[i] <= 0)
+          throw new ArgumentOutOfRangeException(nameof(lods), $"LOD level {i} cannot be less than 0");
+        if (i < lods.Length - 1 && lods[i] > lods[i + 1])
+          Debug.LogWarning($"Value of the LOD level {i} ({lods[i]}) is more than {i + 1} ({lods[i + 1]})");
+      }
+
+      if (_lods != null && _lods.Length == lods.Length) {
+        for (var i = 0; i < lods.Length; i++)
+          _lods[i] = lods[i];
+      }
+      else {
+        _lods = (float[])lods.Clone();
+      }
+
+      return this;
+    }
+
+    public StreamAction SetLOD(int index) {
+      if (index < 0 || index >= _lods.Length)
+        throw new ArgumentOutOfRangeException(nameof(index));
+      SetDelta(_lods[_lodIndex = index]);
+      return this;
+    }
+
+    public StreamAction NextLOD() {
+      _lodIndex = Math.Min(++_lodIndex, _lods.Length - 1);
+      SetDelta(_lods[_lodIndex]);
+      return this;
+    }
+
+    public StreamAction PrevLOD() {
+      _lodIndex = Math.Max(--_lodIndex, 0);
+      SetDelta(_lods[_lodIndex]);
       return this;
     }
 

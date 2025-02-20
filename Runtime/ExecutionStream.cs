@@ -29,9 +29,7 @@ namespace StreamsForUnity {
 
     private readonly string _name;
     private readonly string _profilerName;
-    private float? _streamDeltaTime;
-    private float _accumulatedDeltaTime;
-    private bool _lock;
+    private bool _locked;
 
     internal ExecutionStream(StreamToken disposeToken, string name) {
       disposeToken.Register(Dispose);
@@ -76,11 +74,15 @@ namespace StreamsForUnity {
       if (condition == null)
         throw new ArgumentNullException(nameof(condition));
 
+      var sts = new StreamTokenSource();
       var streamAction = new StreamAction(deltaTime => {
         if (condition())
           action(deltaTime);
+        else
+          sts.Release();
       }, float.PositiveInfinity, priority);
-      _actionsStorage.Add(streamAction, token);
+      token.Register(sts.Release);
+      _actionsStorage.Add(streamAction, sts.Token);
       return streamAction;
     }
 
@@ -117,15 +119,9 @@ namespace StreamsForUnity {
       });
     }
 
-    public void SetDelta(float delta) {
-      if (delta <= 0)
-        throw new ArgumentOutOfRangeException(nameof(delta));
-      _streamDeltaTime = delta;
-    }
-
     public void Lock(StreamToken lockToken) {
-      _lock = true;
-      lockToken.Register(() => _lock = false);
+      _locked = true;
+      lockToken.Register(() => _locked = false);
     }
 
     public void OnDispose(Action onDispose) {
@@ -156,19 +152,7 @@ namespace StreamsForUnity {
         return;
 
       try {
-        if (!_streamDeltaTime.HasValue) {
-          Execute(deltaTime);
-          return;
-        }
-
-        _accumulatedDeltaTime += deltaTime;
-        if (_accumulatedDeltaTime < _streamDeltaTime.Value)
-          return;
-
-        while (_accumulatedDeltaTime > 0) {
-          Execute(_streamDeltaTime.Value);
-          _accumulatedDeltaTime -= _streamDeltaTime.Value;
-        }
+        Execute(deltaTime);
       }
       finally {
         DelayedActions?.Invoke();
@@ -195,7 +179,7 @@ namespace StreamsForUnity {
       if (_actionsStorage.Count == 0 && _parallelActionsStorage.Count == 0)
         return false;
 
-      if (_lock)
+      if (_locked)
         return false;
 
       return true;
