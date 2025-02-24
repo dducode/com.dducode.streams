@@ -9,7 +9,7 @@ namespace StreamsForUnity.StreamStateMachine {
     protected ExecutionStream Stream => _holder.Stream;
 
     private StreamTokenSource _lockHandle = new();
-    private IStreamHolder _holder;
+    private IConfiguredStreamHolder _holder;
 
     internal void Initialize<TBaseSystem>(IStateMachine stateMachine, StreamToken disposeToken) {
       StateMachine = stateMachine;

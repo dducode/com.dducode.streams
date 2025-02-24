@@ -1,8 +1,10 @@
+using UnityEngine;
 using UnityEngine.PlayerLoop;
 
 namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
 
-  public class LateUpdateStreamHolder : MonoStreamHolder<PreLateUpdate> {
+  [AddComponentMenu("Streams/Holders/Late Update Stream Holder")]
+  public sealed class LateUpdateStreamHolder : MonoStreamHolder<PreLateUpdate> {
 
   }
 

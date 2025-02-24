@@ -1,37 +1,67 @@
+using System;
 using StreamsForUnity.Internal.Extensions;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 
 namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
 
-  [DisallowMultipleComponent]
-  public abstract class MonoStreamHolder<TBaseSystem> : MonoBehaviour, IStreamHolder {
+  public abstract class MonoStreamHolderBase : MonoBehaviour, IStreamHolder {
 
-    [SerializeField] private UnityEvent<float> predefinedActions;
+    [SerializeField] protected UpdatableBehaviour[] connectedBehaviours;
 
-    public ExecutionStream Stream => _stream ??= CreateStream();
+    public abstract ExecutionStream Stream { get; }
+    public abstract uint Priority { get; set; }
 
-    public uint Priority {
+    public IStreamHolder Join(IStreamHolder other) {
+      if (other.Priority < Priority)
+        return other.Join(this);
+
+      Stream.Join(other.Stream);
+      other.Dispose();
+      return this;
+    }
+
+    public void Dispose() {
+      DestroyImmediate(gameObject);
+    }
+
+  }
+
+  public abstract class MonoStreamHolder<TBaseSystem> : MonoStreamHolderBase, IConfiguredStreamHolder {
+
+    public override ExecutionStream Stream => _stream ??= CreateStream();
+
+    public override uint Priority {
       get => _priority;
       set {
         if (_priority == value)
           return;
 
-        if (_execution != null)
-          ChangePriority(value);
+        ChangePriority(value);
       }
     }
 
     public float Delta {
-      get => _delta;
+      get => _delta ?? throw new ArgumentNullException(nameof(Delta));
       set {
-        if (value < 0f)
-          throw new StreamsException("Delta cannot be negative");
-        if (Mathf.Approximately(_delta, value))
+        if (value <= 0f)
+          throw new ArgumentOutOfRangeException(nameof(Delta), "Delta cannot be negative or zero");
+        if (_delta.HasValue && Mathf.Approximately(_delta.Value, value))
           return;
 
-        _execution.SetDelta(_delta = value);
+        _execution.SetDelta((_delta = value).Value);
+      }
+    }
+
+    public uint TickRate {
+      get => _tickRate;
+      set {
+        if (value == 0)
+          throw new ArgumentOutOfRangeException(nameof(TickRate), "Tick rate cannot be zero");
+        if (_tickRate == value)
+          return;
+
+        _execution.SetTickRate(_tickRate = value);
       }
     }
 
@@ -48,23 +78,16 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     private GameObject _gameObject;
     private Transform _parent;
     private Scene _scene;
-    private float _delta;
+    private float? _delta;
+    private uint _tickRate = 1;
 
     public ExecutionStream CreateNested<THolder>(string streamName = "StreamHolder") where THolder : MonoStreamHolder<TBaseSystem> {
       return _streamHolderFactory.Create<THolder>(_transform, streamName).Stream;
     }
 
-    public IStreamHolder Join(IStreamHolder other) {
-      if (other.Priority < Priority)
-        return other.Join(this);
-
-      Stream.Join(other.Stream);
-      other.Dispose();
-      return this;
-    }
-
-    public void Dispose() {
-      DestroyImmediate(_gameObject);
+    public void ResetDelta() {
+      _delta = null;
+      _execution.ResetDelta();
     }
 
     private void Start() {
@@ -78,7 +101,7 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
 
     private void OnDisable() {
       _lockHandle = new StreamTokenSource();
-      Stream.Lock(_lockHandle.Token);
+      _stream.Lock(_lockHandle.Token);
     }
 
     private void OnDestroy() {
@@ -88,12 +111,8 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
 
     private ExecutionStream CreateStream() {
       Initialize();
-
-      _destroyHandle = new StreamTokenSource();
       var stream = new ExecutionStream(_destroyHandle.Token, _gameObject.name);
       SetupStream(stream);
-
-      Streams.Get<TBaseSystem>().Add(AutoReconnect, _destroyHandle.Token);
       return stream;
     }
 
@@ -103,14 +122,20 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
       _parent = _transform.parent;
       _scene = _gameObject.scene;
       _priority = (uint)_transform.GetSiblingIndex();
+      _destroyHandle = new StreamTokenSource();
+      Streams.Get<TBaseSystem>().Add(AutoReconnect, _destroyHandle.Token);
     }
 
     private void SetupStream(ExecutionStream stream) {
       _subscriptionHandle = new StreamTokenSource();
       _execution = GetBaseStream(_transform.parent).Add(stream.Update, _subscriptionHandle.Token, _priority);
 
-      if (predefinedActions != null && predefinedActions.GetPersistentEventCount() > 0)
-        stream.Add(predefinedActions.Invoke, _destroyHandle.Token);
+      foreach (UpdatableBehaviour behaviour in connectedBehaviours) {
+        if (behaviour.RunOnBackgroundThread)
+          stream.AddParallel(behaviour.UpdateFunction, behaviour.destroyCancellationToken);
+        else
+          stream.Add(behaviour.UpdateFunction, behaviour.destroyCancellationToken);
+      }
     }
 
     private ExecutionStream GetBaseStream(Transform parent) {
@@ -132,7 +157,10 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
       _parent = _transform.parent;
       _scene = _gameObject.scene;
       _priority = (uint)transform.GetSiblingIndex();
-      _execution = GetBaseStream(_transform.parent).Add(_stream.Update, _subscriptionHandle.Token, _priority);
+
+      _execution = GetBaseStream(_transform.parent).Add(_stream.Update, _subscriptionHandle.Token, _priority).SetTickRate(_tickRate);
+      if (_delta.HasValue)
+        _execution.SetDelta(_delta.Value);
     }
 
     private void ChangePriority(uint priority) {

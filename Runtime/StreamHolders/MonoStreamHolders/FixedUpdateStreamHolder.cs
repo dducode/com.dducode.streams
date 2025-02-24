@@ -1,8 +1,10 @@
+using UnityEngine;
 using UnityEngine.PlayerLoop;
 
 namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
 
-  public class FixedUpdateStreamHolder : MonoStreamHolder<FixedUpdate> {
+  [AddComponentMenu("Streams/Holders/Fixed Update Stream Holder")]
+  public sealed class FixedUpdateStreamHolder : MonoStreamHolder<FixedUpdate> {
 
   }
 

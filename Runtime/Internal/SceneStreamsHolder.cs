@@ -6,7 +6,7 @@ namespace StreamsForUnity.Internal {
 
   internal sealed class SceneStreamsHolder {
 
-    private readonly Dictionary<Type, IStreamHolder> _holders = new();
+    private readonly Dictionary<Type, IConfiguredStreamHolder> _holders = new();
     private readonly StreamTokenSource _disposeHandle = new();
 
     internal void AddStreamHolder<TBaseSystem>(StreamHolder<TBaseSystem> holder, StreamTokenSource disposeHandle) {
@@ -15,7 +15,7 @@ namespace StreamsForUnity.Internal {
     }
 
     internal bool TryGetStream<TBaseSystem>(out ExecutionStream executionStream) {
-      if (_holders.TryGetValue(typeof(TBaseSystem), out IStreamHolder runner)) {
+      if (_holders.TryGetValue(typeof(TBaseSystem), out IConfiguredStreamHolder runner)) {
         executionStream = runner.Stream;
         return true;
       }
@@ -25,7 +25,7 @@ namespace StreamsForUnity.Internal {
     }
 
     internal void ReorderHolders(uint priority) {
-      foreach (IStreamHolder holder in _holders.Values)
+      foreach (IConfiguredStreamHolder holder in _holders.Values)
         holder.Priority = priority;
     }
 

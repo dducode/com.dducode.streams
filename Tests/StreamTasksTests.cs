@@ -33,7 +33,7 @@ namespace StreamsForUnity.Tests {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(2, tcs);
       var flag = false;
-      ExecutionStream stream = Streams.Get<Update>();
+      IExecutionStream stream = Streams.Get<Update>();
       stream.AddTimer(1, () => flag = true);
       stream.AddOnce(async () => {
         await StreamTask.WaitWhile(() => !flag);

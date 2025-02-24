@@ -12,7 +12,7 @@ namespace StreamsForUnity.StreamTasks.Extensions {
 
     public static StreamTask ToStreamTask(this Task task) {
       var streamTask = new StreamTask();
-      ExecutionStream runningStream = StreamTaskHelper.GetRunningStream();
+      IExecutionStream runningStream = StreamTaskHelper.GetRunningStream();
       task.ContinueWith(_ => runningStream.AddOnce(streamTask.SetResult));
       return streamTask;
     }
@@ -20,7 +20,7 @@ namespace StreamsForUnity.StreamTasks.Extensions {
 #if STREAMS_UNITASK_INTEGRATION
     public static StreamTask ToStreamTask(this UniTask uniTask) {
       var streamTask = new StreamTask();
-      ExecutionStream runningStream = StreamTaskHelper.GetRunningStream();
+      IExecutionStream runningStream = StreamTaskHelper.GetRunningStream();
       uniTask.ContinueWith(() => runningStream.AddOnce(streamTask.SetResult));
       return streamTask;
     }
@@ -29,7 +29,7 @@ namespace StreamsForUnity.StreamTasks.Extensions {
 #if UNITY_2023_1_OR_NEWER
     public static StreamTask ToStreamTask(this Awaitable awaitable) {
       var streamTask = new StreamTask();
-      ExecutionStream runningStream = StreamTaskHelper.GetRunningStream();
+      IExecutionStream runningStream = StreamTaskHelper.GetRunningStream();
       awaitable.GetAwaiter().OnCompleted(() => runningStream.AddOnce(streamTask.SetResult));
       return streamTask;
     }

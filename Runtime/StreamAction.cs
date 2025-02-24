@@ -27,11 +27,12 @@ namespace StreamsForUnity {
 
     private event Action DisposeEvent;
     private readonly Action<float> _action;
+
     private float? _actionDeltaTime;
     private float _accumulatedDeltaTime;
 
-    private float[] _lods;
-    private int _lodIndex;
+    private uint _tickRate = 1;
+    private ulong _ticks;
 
     private string _name = nameof(StreamAction);
 
@@ -43,52 +44,35 @@ namespace StreamsForUnity {
 
     public StreamAction SetDelta(float delta) {
       if (delta <= 0)
-        throw new ArgumentOutOfRangeException(nameof(delta));
+        throw new ArgumentOutOfRangeException(nameof(delta), "Delta should be positive");
       _actionDeltaTime = delta;
+      _accumulatedDeltaTime = 0;
       return this;
     }
 
-    public StreamAction SetupLevelsOfDetails(params float[] lods) {
-      for (var i = 0; i < lods.Length; i++) {
-        if (lods[i] <= 0)
-          throw new ArgumentOutOfRangeException(nameof(lods), $"LOD level {i} cannot be less than 0");
-        if (i < lods.Length - 1 && lods[i] > lods[i + 1])
-          Debug.LogWarning($"Value of the LOD level {i} ({lods[i]}) is more than {i + 1} ({lods[i + 1]})");
-      }
-
-      if (_lods != null && _lods.Length == lods.Length) {
-        for (var i = 0; i < lods.Length; i++)
-          _lods[i] = lods[i];
-      }
-      else {
-        _lods = (float[])lods.Clone();
-      }
-
+    public StreamAction ResetDelta() {
+      _actionDeltaTime = null;
+      _accumulatedDeltaTime = 0;
       return this;
     }
 
-    public StreamAction SetLOD(int index) {
-      if (index < 0 || index >= _lods.Length)
-        throw new ArgumentOutOfRangeException(nameof(index));
-      SetDelta(_lods[_lodIndex = index]);
-      return this;
-    }
-
-    public StreamAction NextLOD() {
-      _lodIndex = Math.Min(++_lodIndex, _lods.Length - 1);
-      SetDelta(_lods[_lodIndex]);
-      return this;
-    }
-
-    public StreamAction PrevLOD() {
-      _lodIndex = Math.Max(--_lodIndex, 0);
-      SetDelta(_lods[_lodIndex]);
+    public StreamAction SetTickRate(uint tickRate) {
+      if (tickRate == 0)
+        throw new ArgumentOutOfRangeException(nameof(tickRate), "Tick rate cannot be zero");
+      if (_actionDeltaTime.HasValue)
+        Debug.LogWarning("Tick rate has no effect when delta is set");
+      _tickRate = tickRate;
       return this;
     }
 
     public StreamAction OnDispose([NotNull] Action onDispose) {
       DisposeEvent += onDispose ?? throw new ArgumentNullException(nameof(onDispose));
       return this;
+    }
+
+    internal void CopyParamsFrom(StreamAction other) {
+      _actionDeltaTime = other._actionDeltaTime;
+      _tickRate = other._tickRate;
     }
 
     internal void ChangePriority(uint priority) {
@@ -105,7 +89,8 @@ namespace StreamsForUnity {
 
       if (!_actionDeltaTime.HasValue) {
         try {
-          _action.Invoke(deltaTime);
+          if (++_ticks % _tickRate == 0)
+            _action.Invoke(deltaTime);
         }
         finally {
           RemainingTime -= deltaTime;
@@ -115,10 +100,8 @@ namespace StreamsForUnity {
       }
 
       _accumulatedDeltaTime += Math.Min(deltaTime, RemainingTime);
-      if (_accumulatedDeltaTime < _actionDeltaTime.Value)
-        return;
 
-      while (_accumulatedDeltaTime > 0) {
+      while (_accumulatedDeltaTime > _actionDeltaTime.Value || Mathf.Approximately(_accumulatedDeltaTime, _actionDeltaTime.Value)) {
         try {
           _action.Invoke(_actionDeltaTime.Value);
         }

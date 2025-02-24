@@ -1,15 +1,14 @@
 using System;
 using StreamsForUnity.Internal;
 using StreamsForUnity.StreamTasks;
+using UnityEngine;
 using UnityEngine.Profiling;
-using Debug = UnityEngine.Debug;
 
 namespace StreamsForUnity {
 
-  public sealed class ExecutionStream : IManagedExecutionStream {
+  public class RootExecutionStream : IExecutionStream {
 
     public StreamState StreamState { get; private set; }
-    public bool Locked { get; private set; }
 
     private readonly ActionsStorage _actionsStorage = new();
     private readonly ActionsStorage _parallelActionsStorage = new();
@@ -25,7 +24,7 @@ namespace StreamsForUnity {
       return new ExecutionStream(disposeToken, name);
     }
 
-    internal ExecutionStream(StreamToken disposeToken, string name) {
+    internal RootExecutionStream(StreamToken disposeToken, string name) {
       disposeToken.Register(Dispose);
       _name = name;
       _profilerName = $"{_name} (stream)";
@@ -113,29 +112,12 @@ namespace StreamsForUnity {
       });
     }
 
-    public void Lock(StreamToken lockToken) {
-      Locked = true;
-      lockToken.Register(() => Locked = false);
-    }
-
     public void OnDispose(Action onDispose) {
       DisposeEvent += onDispose ?? throw new ArgumentNullException(nameof(onDispose));
     }
 
     public override string ToString() {
       return _name;
-    }
-
-    internal void Join(ExecutionStream other) {
-      IExecutionStream runningStream = Streams.RunningStream;
-      if (runningStream == this || runningStream == other)
-        throw new StreamsException($"Cannot join a running stream ({runningStream})");
-
-      _actionsStorage.Join(other._actionsStorage);
-      _parallelActionsStorage.Join(other._parallelActionsStorage);
-      DelayedActions += other.DelayedActions;
-      DisposeEvent += other.DisposeEvent;
-      other.SilentDispose();
     }
 
     internal void Update(float deltaTime) {
@@ -170,13 +152,7 @@ namespace StreamsForUnity {
     }
 
     private bool CanExecute() {
-      if (_actionsStorage.Count == 0 && _parallelActionsStorage.Count == 0)
-        return false;
-
-      if (Locked)
-        return false;
-
-      return true;
+      return _actionsStorage.Count != 0 || _parallelActionsStorage.Count != 0;
     }
 
     private void Execute(float deltaTime) {
@@ -224,12 +200,6 @@ namespace StreamsForUnity {
       _actionsStorage.Dispose();
       _parallelActionsStorage.Dispose();
       DisposeEvent?.Invoke();
-      DisposeEvent = null;
-      StreamState = StreamState.Disposed;
-    }
-
-    private void SilentDispose() {
-      DelayedActions = null;
       DisposeEvent = null;
       StreamState = StreamState.Disposed;
     }

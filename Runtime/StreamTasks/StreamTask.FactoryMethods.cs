@@ -31,6 +31,8 @@ namespace StreamsForUnity.StreamTasks {
     public static StreamTask WaitWhile([NotNull] Func<bool> condition, StreamToken token = default) {
       if (condition == null)
         throw new ArgumentNullException(nameof(condition));
+      if (!condition())
+        return CompletedTask;
 
       var task = new StreamTask();
       var cts = new StreamTokenSource();

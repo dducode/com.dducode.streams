@@ -13,13 +13,22 @@ namespace StreamsForUnity {
 
   public static class Streams {
 
-    [CanBeNull] public static ExecutionStream RunningStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
+    [CanBeNull] public static IExecutionStream RunningStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
 
     private static readonly Dictionary<Type, ExecutionStream> _connectedStreams = new();
-    private static readonly Stack<ExecutionStream> _streamsStack = new();
+    private static readonly Stack<IExecutionStream> _streamsStack = new();
     private static StreamTokenSource _streamsCancellation = new();
 
-    public static ExecutionStream Get<TSystem>() {
+    static Streams() {
+#if UNITY_EDITOR
+      EditorApplication.playModeStateChanged += state => {
+        if (state == PlayModeStateChange.ExitingPlayMode)
+          DisposeAllStreams();
+      };
+#endif
+    }
+
+    public static IExecutionStream Get<TSystem>() {
 #if UNITY_EDITOR
       if (!EditorApplication.isPlaying)
         throw new StreamsException("Cannot get stream when editor is not playing");
@@ -27,7 +36,7 @@ namespace StreamsForUnity {
       return _connectedStreams.TryGetValue(typeof(TSystem), out ExecutionStream stream) ? stream : CreateStream<TSystem>();
     }
 
-    internal static void PushStream(ExecutionStream stream) {
+    internal static void PushStream(IExecutionStream stream) {
       _streamsStack.Push(stream);
     }
 
@@ -38,7 +47,6 @@ namespace StreamsForUnity {
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Initialize() {
       _streamsCancellation = new StreamTokenSource();
-      Application.quitting += DisposeAllStreams;
 
       CreateStream<Update>();
       CreateStream<FixedUpdate>();
@@ -57,7 +65,6 @@ namespace StreamsForUnity {
     private static void DisposeAllStreams() {
       _streamsCancellation.Release();
       _connectedStreams.Clear();
-      Application.quitting -= DisposeAllStreams;
     }
 
   }
