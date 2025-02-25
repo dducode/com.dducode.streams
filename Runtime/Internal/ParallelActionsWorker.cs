@@ -21,13 +21,20 @@ namespace StreamsForUnity.Internal {
       };
     }
 
-    public void Start(float deltaTime, int iterations, [NotNull] Action<float, int> body) {
+    public void Start(float deltaTime, int iterations, ParallelWorkStrategy strategy, [NotNull] Action<float, int> body) {
       if (body == null)
         throw new ArgumentNullException(nameof(body));
       if (!_workEvent.IsSet)
         throw new StreamsException("Previous work is still running");
+      if (iterations == 0)
+        return;
 
-      int workersCount = Math.Min(iterations, Environment.ProcessorCount);
+      int workersCount = strategy switch {
+        ParallelWorkStrategy.Economy => Math.Min(Math.Max(1, (int)MathF.Log(iterations)), FixedThreadPool.AvailableThreads),
+        ParallelWorkStrategy.Effectively => Math.Min(Math.Max(1, (int)MathF.Sqrt(iterations)), FixedThreadPool.AvailableThreads),
+        ParallelWorkStrategy.Performance => Math.Min(iterations, FixedThreadPool.AvailableThreads),
+        _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, null)
+      };
 
       _state.iterations = iterations;
       _state.deltaTime = deltaTime;

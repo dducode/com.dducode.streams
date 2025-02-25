@@ -8,6 +8,8 @@ namespace StreamsForUnity.Internal {
 
   internal static class FixedThreadPool {
 
+    public static int AvailableThreads => _threads.Length;
+
     private static readonly Thread[] _threads;
     private static readonly object _lock;
     private static readonly Queue<WorkSet> _workSets;

@@ -8,6 +8,7 @@ namespace StreamsForUnity {
 
   public class ExecutionStream {
 
+    public ParallelWorkStrategy ParallelWorkStrategy { get; set; } = ParallelWorkStrategy.Effectively;
     public StreamState StreamState { get; private protected set; }
 
     protected Action disposeCallbacks;
@@ -157,8 +158,7 @@ namespace StreamsForUnity {
       Streams.PushStream(this);
       Profiler.BeginSample(_profilerName);
 
-      if (parallelActionsStorage.Count > 0)
-        _worker.Start(deltaTime, parallelActionsStorage.Count, _handleParallelAction);
+      _worker.Start(deltaTime, parallelActionsStorage.Count, ParallelWorkStrategy, _handleParallelAction);
 
       for (var i = 0; i < actionsStorage.Count; i++)
         HandleAction(deltaTime, actionsStorage, i);

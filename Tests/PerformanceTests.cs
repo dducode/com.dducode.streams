@@ -17,6 +17,12 @@ namespace StreamsForUnity.Tests {
 
     private static readonly ExecutionType[] _executionType = { ExecutionType.Sequential, ExecutionType.Parallel };
 
+    private static readonly ParallelWorkStrategy[] _parallelWorkStrategies = {
+      ParallelWorkStrategy.Economy,
+      ParallelWorkStrategy.Effectively,
+      ParallelWorkStrategy.Performance
+    };
+
     [Test, Performance]
     public void ManyStreamsTest() {
       var sts = new StreamTokenSource();
@@ -41,7 +47,9 @@ namespace StreamsForUnity.Tests {
     [Test, Performance]
     public void ManyActionsTest([ValueSource(nameof(_executionType))] ExecutionType executionType) {
       var sts = new StreamTokenSource();
-      var stream = new ExecutionStream("Stream");
+      var stream = new ExecutionStream("Stream") {
+        ParallelWorkStrategy = ParallelWorkStrategy.Performance
+      };
       sts.Register(stream.Dispose_Internal);
 
       Action<float> work = _ => {
@@ -62,6 +70,31 @@ namespace StreamsForUnity.Tests {
             throw new ArgumentOutOfRangeException(nameof(executionType), executionType, null);
         }
       }
+
+      Measure.Method(() => stream.Update(Time.deltaTime))
+        .WarmupCount(5)
+        .MeasurementCount(60)
+        .Run();
+
+      sts.Release();
+    }
+
+    [Test, Performance]
+    public void ParallelWorkStrategyTest([ValueSource(nameof(_parallelWorkStrategies))] ParallelWorkStrategy strategy) {
+      var sts = new StreamTokenSource();
+      var stream = new ExecutionStream("Stream") {
+        ParallelWorkStrategy = strategy
+      };
+      sts.Register(stream.Dispose_Internal);
+
+      Action<float> work = _ => {
+        Matrix4x4 matrix = GetRandomMatrix();
+        for (var j = 0; j < 1000; j++)
+          matrix *= matrix;
+      };
+
+      for (var i = 0; i < 100; i++)
+        stream.AddParallel(work);
 
       Measure.Method(() => stream.Update(Time.deltaTime))
         .WarmupCount(5)
