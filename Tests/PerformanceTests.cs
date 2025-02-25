@@ -20,10 +20,12 @@ namespace StreamsForUnity.Tests {
     [Test, Performance]
     public void ManyStreamsTest() {
       var sts = new StreamTokenSource();
-      var baseStream = new ExecutionStream(sts.Token, "base");
+      var baseStream = new ExecutionStream("base");
+      sts.Register(baseStream.Dispose_Internal);
 
       for (var i = 0; i < 1000; i++) {
-        var stream = new ExecutionStream(sts.Token, $"Stream {i}");
+        var stream = new ExecutionStream($"Stream {i}");
+        sts.Register(stream.Dispose_Internal);
         baseStream.Add(stream.Update);
         stream.Add(_ => { });
       }
@@ -39,7 +41,8 @@ namespace StreamsForUnity.Tests {
     [Test, Performance]
     public void ManyActionsTest([ValueSource(nameof(_executionType))] ExecutionType executionType) {
       var sts = new StreamTokenSource();
-      var stream = new ExecutionStream(sts.Token, "Stream");
+      var stream = new ExecutionStream("Stream");
+      sts.Register(stream.Dispose_Internal);
 
       Action<float> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();

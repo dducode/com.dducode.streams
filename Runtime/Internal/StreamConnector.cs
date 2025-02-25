@@ -11,7 +11,10 @@ namespace StreamsForUnity.Internal {
         ? () => Time.fixedDeltaTime
         : () => MathF.Max(Time.deltaTime, float.Epsilon); // deltaTime is zero at the first frame
       SystemRegistrar.RegisterStreamAsSystem<TSystem>(() => stream.Update(deltaTime()));
-      stream.OnDispose(SystemRegistrar.UnregisterStream<TSystem>);
+    }
+
+    internal static void DisconnectStreamAt<TSystem>() {
+      SystemRegistrar.UnregisterStream<TSystem>();
     }
 
   }

@@ -6,27 +6,23 @@ using Debug = UnityEngine.Debug;
 
 namespace StreamsForUnity {
 
-  public sealed class ExecutionStream : IManagedExecutionStream {
+  public class ExecutionStream {
 
-    public StreamState StreamState { get; private set; }
-    public bool Locked { get; private set; }
+    public StreamState StreamState { get; private protected set; }
 
-    private readonly ActionsStorage _actionsStorage = new();
-    private readonly ActionsStorage _parallelActionsStorage = new();
+    protected Action disposeCallbacks;
+    protected Action delayedCallbacks;
+
+    private protected readonly ActionsStorage actionsStorage = new();
+    private protected readonly ActionsStorage parallelActionsStorage = new();
+
     private readonly ParallelActionsWorker _worker = new();
     private readonly Action<float, int> _handleParallelAction;
-    private event Action DisposeEvent;
-    private event Action DelayedActions;
 
     private readonly string _name;
     private readonly string _profilerName;
 
-    public static IManagedExecutionStream New(StreamToken disposeToken, string name) {
-      return new ExecutionStream(disposeToken, name);
-    }
-
-    internal ExecutionStream(StreamToken disposeToken, string name) {
-      disposeToken.Register(Dispose);
+    internal ExecutionStream(string name) {
       _name = name;
       _profilerName = $"{_name} (stream)";
       _handleParallelAction = HandleParallelAction;
@@ -36,7 +32,7 @@ namespace StreamsForUnity {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(action, float.PositiveInfinity, priority);
-      _actionsStorage.Add(streamAction, token);
+      actionsStorage.Add(streamAction, token);
       return streamAction;
     }
 
@@ -44,7 +40,7 @@ namespace StreamsForUnity {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(action, float.PositiveInfinity, uint.MaxValue);
-      _parallelActionsStorage.Add(streamAction, token);
+      parallelActionsStorage.Add(streamAction, token);
       return streamAction;
     }
 
@@ -57,7 +53,7 @@ namespace StreamsForUnity {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(action, time, priority);
-      _actionsStorage.Add(streamAction, token);
+      actionsStorage.Add(streamAction, token);
       return streamAction;
     }
 
@@ -76,7 +72,7 @@ namespace StreamsForUnity {
           sts.Release();
       }, float.PositiveInfinity, priority);
       token.Register(sts.Release);
-      _actionsStorage.Add(streamAction, sts.Token);
+      actionsStorage.Add(streamAction, sts.Token);
       return streamAction;
     }
 
@@ -84,14 +80,14 @@ namespace StreamsForUnity {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(_ => action(), float.Epsilon, priority);
-      _actionsStorage.Add(streamAction, token);
+      actionsStorage.Add(streamAction, token);
     }
 
     public void AddOnce(Func<StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(_ => action(), float.Epsilon, uint.MaxValue);
-      _actionsStorage.Add(streamAction, token);
+      actionsStorage.Add(streamAction, token);
     }
 
     public void AddTimer(float time, Action onComplete, StreamToken token = default) {
@@ -103,7 +99,7 @@ namespace StreamsForUnity {
       ValidateAddAction(onComplete);
 
       var streamAction = new StreamAction(_ => { }, time, uint.MaxValue);
-      _actionsStorage.Add(streamAction, token);
+      actionsStorage.Add(streamAction, token);
       streamAction.OnDispose(() => {
         if (StreamState == StreamState.Disposing)
           return;
@@ -113,35 +109,18 @@ namespace StreamsForUnity {
       });
     }
 
-    public void Lock(StreamToken lockToken) {
-      Locked = true;
-      lockToken.Register(() => Locked = false);
-    }
-
     public void OnDispose(Action onDispose) {
-      DisposeEvent += onDispose ?? throw new ArgumentNullException(nameof(onDispose));
+      disposeCallbacks += onDispose ?? throw new ArgumentNullException(nameof(onDispose));
     }
 
     public override string ToString() {
       return _name;
     }
 
-    internal void Join(ExecutionStream other) {
-      IExecutionStream runningStream = Streams.RunningStream;
-      if (runningStream == this || runningStream == other)
-        throw new StreamsException($"Cannot join a running stream ({runningStream})");
-
-      _actionsStorage.Join(other._actionsStorage);
-      _parallelActionsStorage.Join(other._parallelActionsStorage);
-      DelayedActions += other.DelayedActions;
-      DisposeEvent += other.DisposeEvent;
-      other.SilentDispose();
-    }
-
     internal void Update(float deltaTime) {
       ValidateExecution();
-      _actionsStorage.Refresh();
-      _parallelActionsStorage.Refresh();
+      actionsStorage.Refresh();
+      parallelActionsStorage.Refresh();
       if (!CanExecute())
         return;
 
@@ -149,9 +128,13 @@ namespace StreamsForUnity {
         Execute(deltaTime);
       }
       finally {
-        DelayedActions?.Invoke();
-        DelayedActions = null;
+        delayedCallbacks?.Invoke();
+        delayedCallbacks = null;
       }
+    }
+
+    protected virtual bool CanExecute() {
+      return actionsStorage.Count != 0 || parallelActionsStorage.Count != 0;
     }
 
     private void ValidateExecution() {
@@ -160,7 +143,7 @@ namespace StreamsForUnity {
           throw new StreamsException("Cannot execute disposed stream");
         case StreamState.Running:
           StreamState = StreamState.Disposing;
-          Dispose();
+          Dispose_Internal();
           throw new StreamsException("Recursive execution occurred");
         case StreamState.Idle:
           break;
@@ -169,26 +152,16 @@ namespace StreamsForUnity {
       }
     }
 
-    private bool CanExecute() {
-      if (_actionsStorage.Count == 0 && _parallelActionsStorage.Count == 0)
-        return false;
-
-      if (Locked)
-        return false;
-
-      return true;
-    }
-
     private void Execute(float deltaTime) {
       StreamState = StreamState.Running;
       Streams.PushStream(this);
       Profiler.BeginSample(_profilerName);
 
-      if (_parallelActionsStorage.Count > 0)
-        _worker.Start(deltaTime, _parallelActionsStorage.Count, _handleParallelAction);
+      if (parallelActionsStorage.Count > 0)
+        _worker.Start(deltaTime, parallelActionsStorage.Count, _handleParallelAction);
 
-      for (var i = 0; i < _actionsStorage.Count; i++)
-        HandleAction(deltaTime, _actionsStorage, i);
+      for (var i = 0; i < actionsStorage.Count; i++)
+        HandleAction(deltaTime, actionsStorage, i);
 
       _worker.Wait();
 
@@ -198,7 +171,7 @@ namespace StreamsForUnity {
     }
 
     private void HandleParallelAction(float deltaTime, int index) {
-      HandleAction(deltaTime, _parallelActionsStorage, index);
+      HandleAction(deltaTime, parallelActionsStorage, index);
     }
 
     private void HandleAction(float deltaTime, ActionsStorage storage, int index) {
@@ -214,23 +187,18 @@ namespace StreamsForUnity {
       }
     }
 
-    private void Dispose() {
+    internal void Dispose_Internal() {
       if (StreamState == StreamState.Running) {
-        DelayedActions += Dispose;
+        delayedCallbacks += Dispose_Internal;
         return;
       }
 
       StreamState = StreamState.Disposing;
-      _actionsStorage.Dispose();
-      _parallelActionsStorage.Dispose();
-      DisposeEvent?.Invoke();
-      DisposeEvent = null;
-      StreamState = StreamState.Disposed;
-    }
-
-    private void SilentDispose() {
-      DelayedActions = null;
-      DisposeEvent = null;
+      actionsStorage.Dispose();
+      parallelActionsStorage.Dispose();
+      disposeCallbacks?.Invoke();
+      disposeCallbacks = null;
+      delayedCallbacks = null;
       StreamState = StreamState.Disposed;
     }
 

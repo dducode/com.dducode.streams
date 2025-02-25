@@ -13,7 +13,8 @@ namespace StreamsForUnity.Tests.StateMachineTests {
       var disposeSource = new StreamTokenSource();
 
       var finalState = new FinalState();
-      var fsm = new StateMachine<Update.ScriptRunBehaviourUpdate>(disposeSource.Token, new EntryState(), new HelloState(), finalState);
+      var fsm = new StateMachine<Update.ScriptRunBehaviourUpdate>(new EntryState(), new HelloState(), finalState);
+      disposeSource.Register(fsm.Dispose);
       fsm.SetState<EntryState>();
 
       while (fsm.CurrentState != finalState)

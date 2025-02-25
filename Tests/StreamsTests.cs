@@ -73,15 +73,18 @@ namespace StreamsForUnity.Tests {
     public async Task LockStreamTest() {
       var tcs = new TaskCompletionSource<bool>();
       var lockHandle = new StreamTokenSource();
+      var disposeHandle = new StreamTokenSource();
 
-      Streams.Get<Update>()
-        .Add(deltaTime => Debug.Log(deltaTime))
+      ExecutionStream baseStream = Streams.Get<FixedUpdate>();
+      var stream = new ManagedExecutionStream(baseStream, "test");
+      disposeHandle.Register(stream.Dispose);
+
+      stream.Add(deltaTime => Debug.Log(deltaTime))
         .SetDelta(0.1f);
 
-      var stream = (IManagedExecutionStream)Streams.Get<FixedUpdate>();
-      stream.AddTimer(2, () => ((IManagedExecutionStream)Streams.Get<Update>()).Lock(lockHandle.Token));
-      stream.AddTimer(4, () => lockHandle.Release());
-      stream.AddTimer(6, () => tcs.SetResult(true));
+      baseStream.AddTimer(2, () => stream.Lock(lockHandle.Token));
+      baseStream.AddTimer(4, () => lockHandle.Release());
+      baseStream.AddTimer(6, () => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -97,7 +100,7 @@ namespace StreamsForUnity.Tests {
     [Test, Common]
     public async Task ActionsChainTest() {
       var tcs = new TaskCompletionSource<bool>();
-      IExecutionStream stream = Streams.Get<Update>();
+      ExecutionStream stream = Streams.Get<Update>();
       stream.AddOnce(() => {
         Debug.Log(1);
         stream.AddOnce(() => {
@@ -114,7 +117,7 @@ namespace StreamsForUnity.Tests {
     [Test, Common]
     public async Task PriorityActionsTest() {
       var tcs = new TaskCompletionSource<bool>();
-      IExecutionStream stream = Streams.Get<Update>();
+      ExecutionStream stream = Streams.Get<Update>();
       stream.AddOnce(() => {
         Debug.Log(5);
         tcs.SetResult(true);

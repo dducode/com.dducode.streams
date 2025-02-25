@@ -1,6 +1,8 @@
+using System;
+
 namespace StreamsForUnity.StreamStateMachine {
 
-  public interface IStateMachine {
+  public interface IStateMachine : IDisposable {
 
     public void SetState<TState>() where TState : State;
 

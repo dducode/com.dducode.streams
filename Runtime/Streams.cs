@@ -13,10 +13,10 @@ namespace StreamsForUnity {
 
   public static class Streams {
 
-    [CanBeNull] public static IExecutionStream RunningStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
+    [CanBeNull] public static ExecutionStream RunningStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
 
     private static readonly Dictionary<Type, ExecutionStream> _connectedStreams = new();
-    private static readonly Stack<IExecutionStream> _streamsStack = new();
+    private static readonly Stack<ExecutionStream> _streamsStack = new();
     private static StreamTokenSource _streamsCancellation = new();
 
     static Streams() {
@@ -28,7 +28,7 @@ namespace StreamsForUnity {
 #endif
     }
 
-    public static IExecutionStream Get<TSystem>() {
+    public static ExecutionStream Get<TSystem>() {
 #if UNITY_EDITOR
       if (!EditorApplication.isPlaying)
         throw new StreamsException("Cannot get stream when editor is not playing");
@@ -36,7 +36,7 @@ namespace StreamsForUnity {
       return _connectedStreams.TryGetValue(typeof(TSystem), out ExecutionStream stream) ? stream : CreateStream<TSystem>();
     }
 
-    internal static void PushStream(IExecutionStream stream) {
+    internal static void PushStream(ExecutionStream stream) {
       _streamsStack.Push(stream);
     }
 
@@ -54,11 +54,17 @@ namespace StreamsForUnity {
     }
 
     private static ExecutionStream CreateStream<TSystem>() {
-      var stream = new ExecutionStream(_streamsCancellation.Token, NamesUtility.CreateProfilerSampleName(typeof(TSystem)));
-      StreamConnector.Connect<TSystem>(stream);
+      var stream = new ExecutionStream(NamesUtility.CreateProfilerSampleName(typeof(TSystem)));
+      _streamsCancellation.Register(stream.Dispose_Internal);
+
       Type systemType = typeof(TSystem);
       _connectedStreams.Add(systemType, stream);
-      stream.OnDispose(() => _connectedStreams.Remove(systemType));
+      StreamConnector.Connect<TSystem>(stream);
+
+      stream.OnDispose(() => {
+        _connectedStreams.Remove(systemType);
+        StreamConnector.DisconnectStreamAt<TSystem>();
+      });
       return stream;
     }
 

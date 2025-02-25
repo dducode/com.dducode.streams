@@ -18,12 +18,11 @@ namespace StreamsForUnity {
         return stream;
 
       var disposeHandle = new StreamTokenSource();
-      var runner = new StreamHolder<TBaseSystem>(disposeHandle.Token, scene.name) {
-        Priority = SceneManager.GetActiveScene() == scene ? 0 : uint.MaxValue
-      };
+      var newStream = new ExecutionStream(scene.name);
+      disposeHandle.Register(newStream.Dispose_Internal);
 
-      RegisterStreamRunner(scene, runner, disposeHandle);
-      return runner.Stream;
+      RegisterStreamRunner<TBaseSystem>(scene, newStream, disposeHandle, SceneManager.GetActiveScene() == scene ? 0 : uint.MaxValue);
+      return newStream;
     }
 
     public static ExecutionStream CreateNestedStream<THolder>(this Scene scene, string streamName = "StreamHolder")
@@ -51,9 +50,9 @@ namespace StreamsForUnity {
         return;
 
       if (_streamsHolders.TryGetValue(current, out SceneStreamsHolder firstHolder))
-        firstHolder.ReorderHolders(uint.MaxValue);
+        firstHolder.ReorderStreams(uint.MaxValue);
       if (_streamsHolders.TryGetValue(next, out SceneStreamsHolder secondHolder))
-        secondHolder.ReorderHolders(0);
+        secondHolder.ReorderStreams(0);
     }
 
     private static void DisposeAllRunners() {
@@ -78,10 +77,10 @@ namespace StreamsForUnity {
       return false;
     }
 
-    private static void RegisterStreamRunner<TBaseSystem>(Scene scene, StreamHolder<TBaseSystem> holder, StreamTokenSource disposeHandle) {
+    private static void RegisterStreamRunner<TBaseSystem>(Scene scene, ExecutionStream stream, StreamTokenSource disposeHandle, uint priority) {
       if (!_streamsHolders.ContainsKey(scene))
         _streamsHolders.Add(scene, new SceneStreamsHolder());
-      _streamsHolders[scene].AddStreamHolder(holder, disposeHandle);
+      _streamsHolders[scene].AddStream<TBaseSystem>(stream, disposeHandle, priority);
     }
 
   }

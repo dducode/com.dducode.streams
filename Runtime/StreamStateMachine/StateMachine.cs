@@ -10,18 +10,20 @@ namespace StreamsForUnity.StreamStateMachine {
     public State CurrentState { get; private set; }
 
     private readonly Dictionary<Type, State> _states;
+    private readonly StreamTokenSource _disposeHandle;
     private StreamTokenSource _stateCancelling = new();
     private bool _entering;
 
-    public StateMachine(StreamToken disposeToken, [NotNull] params State[] states) {
+    public StateMachine([NotNull] params State[] states) {
       if (states == null)
         throw new ArgumentNullException(nameof(states));
       if (states.Length == 0)
         throw new ArgumentException("Value cannot be an empty collection", nameof(states));
 
       _states = states.ToDictionary(keySelector: state => state.GetType(), elementSelector: state => state);
-      foreach (State state in states) 
-        state.Initialize<TBaseSystem>(this, disposeToken);
+      _disposeHandle = new StreamTokenSource();
+      foreach (State state in states)
+        state.Initialize<TBaseSystem>(this, _disposeHandle.Token);
     }
 
     public void SetState<TState>() where TState : State {
@@ -31,6 +33,11 @@ namespace StreamsForUnity.StreamStateMachine {
 
       ExitFromCurrentState();
       EnterToState(state);
+    }
+
+    public void Dispose() {
+      _stateCancelling.Dispose();
+      _disposeHandle.Dispose();
     }
 
     private void ExitFromCurrentState() {

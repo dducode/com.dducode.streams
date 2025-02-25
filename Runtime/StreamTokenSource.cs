@@ -4,7 +4,7 @@ using JetBrains.Annotations;
 
 namespace StreamsForUnity {
 
-  public class StreamTokenSource {
+  public class StreamTokenSource : IDisposable {
 
     public StreamToken Token { get; }
     public bool Released { get; private set; }
@@ -29,6 +29,10 @@ namespace StreamsForUnity {
       if (onReleaseAction == null)
         throw new ArgumentNullException(nameof(onReleaseAction));
       _onReleaseActions.Enqueue(onReleaseAction);
+    }
+
+    public void Dispose() {
+      Release();
     }
 
   }

@@ -9,7 +9,7 @@ namespace StreamsForUnity.LODs {
 
   public abstract class ExecutionLOD<TValue> : MonoBehaviour where TValue : struct {
 
-    [SerializeField] private MonoStreamHolderBase holder;
+    [SerializeField] private StreamHolderBase holder;
     [SerializeField] private UpdatableBehaviour[] behaviours;
     [SerializeField, Min(1)] private float maxThreshold = 25;
     [SerializeField] private LODLevel<TValue>[] levels;

@@ -1,20 +1,19 @@
 using StreamsForUnity.Internal;
-using StreamsForUnity.StreamHolders;
 
 namespace StreamsForUnity.StreamStateMachine {
 
   public abstract class State {
 
     protected IStateMachine StateMachine { get; private set; }
-    protected ExecutionStream Stream => _holder.Stream;
+    protected ManagedExecutionStream Stream { get; private set; }
 
     private StreamTokenSource _lockHandle = new();
-    private IConfiguredStreamHolder _holder;
 
     internal void Initialize<TBaseSystem>(IStateMachine stateMachine, StreamToken disposeToken) {
       StateMachine = stateMachine;
-      _holder = new StreamHolder<TBaseSystem>(disposeToken, NamesUtility.CreateProfilerSampleName(GetType()));
-      _holder.Stream.Lock(_lockHandle.Token);
+      Stream = new ManagedExecutionStream(Streams.Get<TBaseSystem>(), NamesUtility.CreateProfilerSampleName(GetType()));
+      disposeToken.Register(Stream.Dispose);
+      Stream.Lock(_lockHandle.Token);
       OnInitialize();
     }
 
@@ -26,7 +25,7 @@ namespace StreamsForUnity.StreamStateMachine {
 
     internal void Exit() {
       _lockHandle = new StreamTokenSource();
-      _holder.Stream.Lock(_lockHandle.Token);
+      Stream.Lock(_lockHandle.Token);
       OnExit();
     }
 

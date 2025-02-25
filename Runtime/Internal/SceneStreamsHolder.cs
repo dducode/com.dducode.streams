@@ -1,22 +1,23 @@
 using System;
 using System.Collections.Generic;
-using StreamsForUnity.StreamHolders;
 
 namespace StreamsForUnity.Internal {
 
   internal sealed class SceneStreamsHolder {
 
-    private readonly Dictionary<Type, IConfiguredStreamHolder> _holders = new();
+    private readonly Dictionary<Type, ExecutionStream> _streams = new();
+    private readonly Dictionary<ExecutionStream, StreamAction> _executions = new();
     private readonly StreamTokenSource _disposeHandle = new();
 
-    internal void AddStreamHolder<TBaseSystem>(StreamHolder<TBaseSystem> holder, StreamTokenSource disposeHandle) {
-      _holders.Add(typeof(TBaseSystem), holder);
+    internal void AddStream<TBaseSystem>(ExecutionStream stream, StreamTokenSource disposeHandle, uint priority) {
+      _streams.Add(typeof(TBaseSystem), stream);
+      _executions.Add(stream, Streams.Get<TBaseSystem>().Add(stream.Update, disposeHandle.Token, priority));
       _disposeHandle.Register(disposeHandle.Release);
     }
 
     internal bool TryGetStream<TBaseSystem>(out ExecutionStream executionStream) {
-      if (_holders.TryGetValue(typeof(TBaseSystem), out IConfiguredStreamHolder runner)) {
-        executionStream = runner.Stream;
+      if (_streams.TryGetValue(typeof(TBaseSystem), out ExecutionStream stream)) {
+        executionStream = stream;
         return true;
       }
 
@@ -24,14 +25,14 @@ namespace StreamsForUnity.Internal {
       return false;
     }
 
-    internal void ReorderHolders(uint priority) {
-      foreach (IConfiguredStreamHolder holder in _holders.Values)
-        holder.Priority = priority;
+    internal void ReorderStreams(uint priority) {
+      foreach (ExecutionStream stream in _streams.Values)
+        _executions[stream].ChangePriority(priority);
     }
 
     internal void DisposeAttachedHolders() {
       _disposeHandle.Release();
-      _holders.Clear();
+      _streams.Clear();
     }
 
   }
