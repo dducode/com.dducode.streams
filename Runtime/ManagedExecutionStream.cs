@@ -5,7 +5,8 @@ namespace StreamsForUnity {
 
   public sealed class ManagedExecutionStream : ExecutionStream, IDisposable {
 
-    public bool Locked { get; private set; }
+    public bool Locked => _lockers > 0;
+    public StreamUnlockMode UnlockMode { get; }
 
     public uint Priority {
       get {
@@ -55,17 +56,32 @@ namespace StreamsForUnity {
     private uint _tickRate = 1;
     private StreamTokenSource _subscriptionHandle;
     private StreamAction _execution;
+    private int _lockers;
 
     public ManagedExecutionStream(
-      ExecutionStream baseStream, string name, uint priority = uint.MaxValue
+      ExecutionStream baseStream,
+      string name = nameof(ManagedExecutionStream),
+      uint priority = uint.MaxValue,
+      StreamUnlockMode unlockMode = StreamUnlockMode.WhenAll
     ) : base(name) {
       _subscriptionHandle = new StreamTokenSource();
-      _execution = baseStream.Add(Update, _subscriptionHandle.Token, priority);
+      _execution = baseStream.Add(Update, _subscriptionHandle.Token, _priority = priority);
+      UnlockMode = unlockMode;
     }
 
     public void Lock(StreamToken lockToken) {
-      Locked = true;
-      lockToken.Register(() => Locked = false);
+      switch (UnlockMode) {
+        case StreamUnlockMode.WhenAll:
+          _lockers++;
+          lockToken.Register(() => _lockers--);
+          break;
+        case StreamUnlockMode.WhenAny:
+          _lockers = 1;
+          lockToken.Register(() => _lockers = 0);
+          break;
+        default:
+          throw new ArgumentOutOfRangeException();
+      }
     }
 
     public void Join(ManagedExecutionStream other) {

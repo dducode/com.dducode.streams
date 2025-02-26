@@ -76,7 +76,7 @@ namespace StreamsForUnity.Tests {
       var disposeHandle = new StreamTokenSource();
 
       ExecutionStream baseStream = Streams.Get<FixedUpdate>();
-      var stream = new ManagedExecutionStream(baseStream, "test");
+      var stream = new ManagedExecutionStream(baseStream);
       disposeHandle.Register(stream.Dispose);
 
       stream.Add(deltaTime => Debug.Log(deltaTime))
@@ -87,6 +87,41 @@ namespace StreamsForUnity.Tests {
       baseStream.AddTimer(6, () => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);
+      disposeHandle.Release();
+    }
+
+    [Test, Common]
+    public async Task ManyLockersTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      var lockHandle = new StreamTokenSource();
+      var firstLockHandle = new StreamTokenSource();
+      var secondLockHandle = new StreamTokenSource();
+      var thirdLockHandle = new StreamTokenSource();
+      lockHandle.Register(() => {
+        firstLockHandle.Release();
+        secondLockHandle.Release();
+        thirdLockHandle.Release();
+      });
+
+      var disposeHandle = new StreamTokenSource();
+
+      ExecutionStream baseStream = Streams.Get<FixedUpdate>();
+      var stream = new ManagedExecutionStream(baseStream);
+      disposeHandle.Register(stream.Dispose);
+
+      stream.Add(deltaTime => Debug.Log(deltaTime))
+        .SetDelta(0.1f);
+
+      baseStream.AddTimer(2, () => {
+        stream.Lock(firstLockHandle.Token);
+        stream.Lock(secondLockHandle.Token);
+        stream.Lock(thirdLockHandle.Token);
+      });
+      baseStream.AddTimer(4, () => lockHandle.Release());
+      baseStream.AddTimer(6, () => tcs.SetResult(true));
+
+      Assert.IsTrue(await tcs.Task);
+      disposeHandle.Release();
     }
 
     [Test, Common]
