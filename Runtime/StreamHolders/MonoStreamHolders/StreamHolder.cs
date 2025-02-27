@@ -27,25 +27,16 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     private Scene _scene;
     private int _siblingIndex;
 
-    public ExecutionStream CreateNested<THolder>(string streamName = "StreamHolder") where THolder : StreamHolder<TBaseSystem> {
-      return _streamHolderFactory.Create<THolder>(_transform, streamName).Stream;
+    public ExecutionStream CreateNested<THolder>(string holderName = "StreamHolder") where THolder : StreamHolder<TBaseSystem> {
+      return _streamHolderFactory.Create<THolder>(_transform, holderName).Stream;
     }
 
-    public IStreamHolder Join(IStreamHolder other) {
-      if (other.Stream.Priority < Stream.Priority)
-        return other.Join(this);
-
-      Stream.Join(other.Stream);
-      other.Dispose();
-      return this;
+    public ManagedExecutionStream Join(ManagedExecutionStream other) {
+      return _stream.Join(other);
     }
 
-    public void Dispose() {
-      DestroyImmediate(gameObject);
-    }
-
-    public void ResetDelta() {
-      _stream.ResetDelta();
+    public override string ToString() {
+      return gameObject.name;
     }
 
     private void Start() {
@@ -68,7 +59,12 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
 
     private ManagedExecutionStream CreateStream() {
       Initialize();
-      var stream = new ManagedExecutionStream(GetBaseStream(_transform.parent), _gameObject.name, (uint)_siblingIndex);
+      var stream = new ManagedExecutionStream(GetBaseStream(_parent), _gameObject.name, (uint)_siblingIndex);
+      stream.OnDispose(() => {
+        if (_destroyHandle.Released)
+          return;
+        Destroy(gameObject);
+      });
       _destroyHandle.Register(stream.Dispose);
       ConnectBehaviours(stream);
       return stream;
@@ -85,6 +81,9 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     }
 
     private void ConnectBehaviours(ExecutionStream stream) {
+      if (connectedBehaviours == null)
+        return;
+
       foreach (UpdatableBehaviour behaviour in connectedBehaviours) {
         if (behaviour.RunOnBackgroundThread)
           stream.AddParallel(behaviour.UpdateFunction, behaviour.destroyCancellationToken);
@@ -113,15 +112,19 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
       _parent = _transform.parent;
       _scene = _gameObject.scene;
       var priority = (int)_stream.Priority;
-      _stream.Reconnect(GetBaseStream(_transform.parent));
+      _stream.Reconnect(GetBaseStream(_parent));
       ChangePriority(priority);
     }
 
     private void ChangePriority(int priority) {
-      priority = Mathf.Clamp(priority, 0, _transform.parent.childCount - 1);
+      priority = Mathf.Clamp(priority, 0, GetMaxObjectsInHierarchy());
       _transform.SetSiblingIndex(priority);
       _stream.Priority = (uint)priority;
       _siblingIndex = priority;
+    }
+
+    private int GetMaxObjectsInHierarchy() {
+      return _parent != null ? _parent.childCount - 1 : _scene.rootCount - 1;
     }
 
   }

@@ -39,7 +39,7 @@ namespace StreamsForUnity.Tests {
 
       Streams.Get<Update>().AddTemporary(2, delta => {
         Debug.Log(delta);
-      }).SetDelta(0.5f).OnDispose(() => tcs.SetResult(true));
+      }).SetDelta(0.5f).OnComplete(() => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -50,7 +50,7 @@ namespace StreamsForUnity.Tests {
 
       Streams.Get<FixedUpdate>().AddTemporary(0.2f, delta => {
         Debug.Log(delta);
-      }).SetDelta(0.002f).OnDispose(() => tcs.SetResult(true));
+      }).SetDelta(0.002f).OnComplete(() => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -58,14 +58,14 @@ namespace StreamsForUnity.Tests {
     [Test, Common]
     public async Task ConditionalTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var disposeHandle = new StreamTokenSource();
+      var completionHandle = new StreamTokenSource();
 
       Streams.Get<Update>()
-        .AddConditional(() => true, delta => Debug.Log(delta), disposeHandle.Token)
+        .AddConditional(() => !completionHandle.Released, delta => Debug.Log(delta))
         .SetDelta(0.1f)
-        .OnDispose(() => tcs.SetResult(true));
+        .OnComplete(() => tcs.SetResult(true));
 
-      Streams.Get<Update>().AddTimer(2, () => disposeHandle.Release());
+      Streams.Get<Update>().AddTimer(2, () => completionHandle.Release());
       Assert.IsTrue(await tcs.Task);
     }
 

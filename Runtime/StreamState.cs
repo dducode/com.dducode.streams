@@ -5,7 +5,8 @@ namespace StreamsForUnity {
     Idle,
     Running,
     Disposing,
-    Disposed
+    Disposed,
+    Invalid
 
   }
 

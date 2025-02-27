@@ -18,9 +18,9 @@ namespace StreamsForUnity {
     public void Release() {
       if (Released)
         return;
+      Released = true;
       while (_onReleaseActions.TryDequeue(out Action action))
         action();
-      Released = true;
     }
 
     internal void Register([NotNull] Action onReleaseAction) {

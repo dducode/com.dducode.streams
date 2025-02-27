@@ -10,7 +10,6 @@ namespace StreamsForUnity.Internal {
     public StreamAction this[int index] => _actions[index];
 
     private readonly List<StreamAction> _actions = new();
-    private readonly Dictionary<StreamAction, StreamToken> _tokens = new();
 
     private readonly Queue<StreamAction> _pendingAddActions = new();
     private readonly Queue<StreamAction> _pendingRemoveActions = new();
@@ -18,20 +17,14 @@ namespace StreamsForUnity.Internal {
 
     private readonly StreamActionComparer _comparer = new();
 
-    public void Add(StreamAction action, StreamToken token) {
-      if (token.Released) {
-        action.Dispose();
-        return;
-      }
-
+    public void Add(StreamAction action) {
       if (!_pendingAddActions.Contains(action))
         _pendingAddActions.Enqueue(action);
 
-      Action removeAction = () => Remove(action);
       action.OnPriorityChanged += () => _dirty = true;
-      action.OnComplete += removeAction;
-      token.Register(removeAction);
-      _tokens.Add(action, token);
+      Action remove = () => Remove(action);
+      action.OnComplete(remove);
+      action.OnCancel(remove);
     }
 
     public void Remove(StreamAction action) {
@@ -50,7 +43,7 @@ namespace StreamsForUnity.Internal {
     public void Join(ActionsStorage otherStorage) {
       otherStorage.Refresh();
       foreach (StreamAction action in otherStorage)
-        Add(action, otherStorage._tokens[action]);
+        Add(action);
       otherStorage.Clear();
     }
 
@@ -66,17 +59,10 @@ namespace StreamsForUnity.Internal {
       return GetEnumerator();
     }
 
-    public void Dispose() {
-      foreach (StreamAction action in _actions)
-        action.Dispose();
-      Clear();
-    }
-
-    private void Clear() {
+    public void Clear() {
       _actions.Clear();
       _pendingAddActions.Clear();
       _pendingRemoveActions.Clear();
-      _tokens.Clear();
     }
 
     private void ApplyChanges() {
@@ -86,9 +72,7 @@ namespace StreamsForUnity.Internal {
       }
 
       while (_pendingRemoveActions.TryDequeue(out StreamAction action)) {
-        action.Dispose();
         _actions.Remove(action);
-        _tokens.Remove(action);
         _dirty = true;
       }
     }

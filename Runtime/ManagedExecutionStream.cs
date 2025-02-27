@@ -39,7 +39,10 @@ namespace StreamsForUnity {
     }
 
     public uint TickRate {
-      get => _tickRate;
+      get {
+        ValidateStreamState();
+        return _tickRate;
+      }
       set {
         ValidateStreamState();
         if (_tickRate == 0)
@@ -55,6 +58,7 @@ namespace StreamsForUnity {
     private float? _delta;
     private uint _tickRate = 1;
     private StreamTokenSource _subscriptionHandle;
+    private ExecutionStream _baseStream;
     private StreamAction _execution;
     private int _lockers;
 
@@ -65,7 +69,9 @@ namespace StreamsForUnity {
       StreamUnlockMode unlockMode = StreamUnlockMode.WhenAll
     ) : base(name) {
       _subscriptionHandle = new StreamTokenSource();
-      _execution = baseStream.Add(Update, _subscriptionHandle.Token, _priority = priority);
+      _baseStream = baseStream;
+      _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority = priority);
+      _baseStream.OnDispose(Dispose);
       UnlockMode = unlockMode;
     }
 
@@ -84,7 +90,10 @@ namespace StreamsForUnity {
       }
     }
 
-    public void Join(ManagedExecutionStream other) {
+    public ManagedExecutionStream Join(ManagedExecutionStream other) {
+      if (other.Priority < Priority)
+        return other.Join(this);
+
       ExecutionStream runningStream = Streams.RunningStream;
       if (runningStream == this || runningStream == other)
         throw new StreamsException($"Cannot join a running stream ({runningStream})");
@@ -93,13 +102,18 @@ namespace StreamsForUnity {
       parallelActionsStorage.Join(other.parallelActionsStorage);
       delayedCallbacks += other.delayedCallbacks;
       disposeCallbacks += other.disposeCallbacks;
-      other.SilentDispose();
+      other.Dispose();
+      return this;
     }
 
     public void Reconnect(ExecutionStream stream, uint? priority = null) {
       _subscriptionHandle?.Release();
       _subscriptionHandle = new StreamTokenSource();
-      _execution = stream.Add(Update, _subscriptionHandle.Token, _priority = priority ?? _priority).SetTickRate(_tickRate);
+
+      _baseStream.RemoveDisposeHandle(Dispose);
+      _baseStream = stream;
+      _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority = priority ?? _priority).SetTickRate(_tickRate);
+      _baseStream.OnDispose(Dispose);
 
       if (_delta.HasValue)
         _execution.SetDelta(_delta.Value);
@@ -111,12 +125,13 @@ namespace StreamsForUnity {
     }
 
     public void Dispose() {
-      StreamState = StreamState.Disposing;
+      if (State is StreamState.Disposing or StreamState.Disposed)
+        return;
+
       _subscriptionHandle.Release();
       _subscriptionHandle = null;
       _execution = null;
       Dispose_Internal();
-      StreamState = StreamState.Disposed;
     }
 
     protected override bool CanExecute() {
@@ -124,14 +139,8 @@ namespace StreamsForUnity {
     }
 
     private void ValidateStreamState() {
-      if (StreamState is StreamState.Disposing or StreamState.Disposed)
-        throw new StreamsException("Stream is disposed");
-    }
-
-    private void SilentDispose() {
-      disposeCallbacks = null;
-      delayedCallbacks = null;
-      StreamState = StreamState.Disposed;
+      if (State is StreamState.Disposing or StreamState.Disposed)
+        throw new ObjectDisposedException(ToString());
     }
 
   }

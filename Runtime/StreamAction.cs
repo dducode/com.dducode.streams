@@ -23,9 +23,9 @@ namespace StreamsForUnity {
     internal int Id { get; } = NextId;
 
     internal event Action OnPriorityChanged;
-    internal event Action OnComplete;
 
-    private event Action DisposeEvent;
+    private event Action CompleteEvent;
+    private event Action CancelEvent;
     private readonly Action<float> _action;
 
     private float? _actionDeltaTime;
@@ -34,12 +34,15 @@ namespace StreamsForUnity {
     private uint _tickRate = 1;
     private ulong _ticks;
 
+    private bool _canceled;
+
     private string _name = nameof(StreamAction);
 
-    internal StreamAction(Action<float> action, float time, uint priority) {
+    internal StreamAction(Action<float> action, float time, StreamToken cancellationToken, uint priority) {
       _action = action;
       RemainingTime = time;
       Priority = priority;
+      cancellationToken.Register(() => _canceled = true);
     }
 
     public StreamAction SetDelta(float delta) {
@@ -65,14 +68,14 @@ namespace StreamsForUnity {
       return this;
     }
 
-    public StreamAction OnDispose([NotNull] Action onDispose) {
-      DisposeEvent += onDispose ?? throw new ArgumentNullException(nameof(onDispose));
+    public StreamAction OnComplete([NotNull] Action onComplete) {
+      CompleteEvent += onComplete ?? throw new ArgumentNullException(nameof(onComplete));
       return this;
     }
 
-    internal void CopyParamsFrom(StreamAction other) {
-      _actionDeltaTime = other._actionDeltaTime;
-      _tickRate = other._tickRate;
+    public StreamAction OnCancel([NotNull] Action onCancel) {
+      CancelEvent += onCancel ?? throw new ArgumentNullException(nameof(onCancel));
+      return this;
     }
 
     internal void ChangePriority(uint priority) {
@@ -80,10 +83,20 @@ namespace StreamsForUnity {
       OnPriorityChanged?.Invoke();
     }
 
+    internal void SetCompletionToken(StreamToken completionToken) {
+      completionToken.Register(() => RemainingTime = 0);
+    }
+
     internal void Invoke(float deltaTime) {
+      if (_canceled) {
+        CancelEvent?.Invoke();
+        CancelEvent = null;
+        return;
+      }
+
       if (RemainingTime <= 0) {
-        OnComplete?.Invoke();
-        OnComplete = null;
+        CompleteEvent?.Invoke();
+        CompleteEvent = null;
         return;
       }
 
@@ -110,11 +123,6 @@ namespace StreamsForUnity {
           RemainingTime -= _actionDeltaTime.Value;
         }
       }
-    }
-
-    internal void Dispose() {
-      DisposeEvent?.Invoke();
-      DisposeEvent = null;
     }
 
     public override string ToString() {
