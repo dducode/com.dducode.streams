@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
+using StreamsForUnity.Exceptions;
 
 namespace StreamsForUnity {
 

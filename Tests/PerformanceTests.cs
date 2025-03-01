@@ -19,7 +19,7 @@ namespace StreamsForUnity.Tests {
 
     private static readonly ParallelWorkStrategy[] _parallelWorkStrategies = {
       ParallelWorkStrategy.Economy,
-      ParallelWorkStrategy.Effectively,
+      ParallelWorkStrategy.Optimal,
       ParallelWorkStrategy.Performance
     };
 
@@ -27,11 +27,11 @@ namespace StreamsForUnity.Tests {
     public void ManyStreamsTest() {
       var sts = new StreamTokenSource();
       var baseStream = new ExecutionStream("base");
-      sts.Register(baseStream.Dispose_Internal);
+      sts.Register(baseStream.Terminate);
 
       for (var i = 0; i < 1000; i++) {
         var stream = new ExecutionStream($"Stream {i}");
-        sts.Register(stream.Dispose_Internal);
+        sts.Register(stream.Terminate);
         baseStream.Add(stream.Update);
         stream.Add(_ => { });
       }
@@ -48,9 +48,9 @@ namespace StreamsForUnity.Tests {
     public void ManyActionsTest([ValueSource(nameof(_executionType))] ExecutionType executionType) {
       var sts = new StreamTokenSource();
       var stream = new ExecutionStream("Stream") {
-        ParallelWorkStrategy = ParallelWorkStrategy.Performance
+        WorkStrategy = ParallelWorkStrategy.Performance
       };
-      sts.Register(stream.Dispose_Internal);
+      sts.Register(stream.Terminate);
 
       Action<float> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();
@@ -83,9 +83,9 @@ namespace StreamsForUnity.Tests {
     public void ParallelWorkStrategyTest([ValueSource(nameof(_parallelWorkStrategies))] ParallelWorkStrategy strategy) {
       var sts = new StreamTokenSource();
       var stream = new ExecutionStream("Stream") {
-        ParallelWorkStrategy = strategy
+        WorkStrategy = strategy
       };
-      sts.Register(stream.Dispose_Internal);
+      sts.Register(stream.Terminate);
 
       Action<float> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using StreamsForUnity.Exceptions;
 using StreamsForUnity.Internal;
 using StreamsForUnity.StreamTasks;
 using UnityEngine.Profiling;
@@ -7,10 +8,33 @@ using Debug = UnityEngine.Debug;
 
 namespace StreamsForUnity {
 
+  /// <summary>
+  /// <p> Base class for all streams in the system. Execution stream contains and executes any actions. </p>
+  /// <p> Base streams executed on the Player Loop Systems, and they can be obtained from <see cref="Streams.Get{TSystem}"/> method.
+  /// If you want to get the stream from scene, you can call <see cref="SceneStreams.GetStream{TBaseSystem}"/> </p>
+  /// <code>
+  /// Streams.Get&lt;Update&gt;().Add(deltaTime => {
+  ///   // do something inside the base stream in the Update system
+  /// });
+  /// </code>
+  /// <code>
+  /// SceneManager.GetActiveScene().GetStream&lt;FixedUpdate&gt;().Add(deltaTime => {
+  ///   // do something inside the active scene stream in the FixedUpdate system
+  /// });
+  /// </code>
+  /// <code>
+  /// gameObject.scene.GetStream&lt;PreLateUpdate&gt;().Add(deltaTime => {
+  ///   // do something inside the game object scene stream in the PreLateUpdate system
+  /// });
+  /// </code>
+  /// </summary>
   public class ExecutionStream {
 
-    public ParallelWorkStrategy ParallelWorkStrategy { get; set; } = ParallelWorkStrategy.Effectively;
-    public StreamState State { get; private protected set; }
+    /// <inheritdoc cref="ParallelWorkStrategy"/>
+    public ParallelWorkStrategy WorkStrategy { get; set; } = ParallelWorkStrategy.Optimal;
+
+    /// <inheritdoc cref="StreamState"/>
+    public StreamState State { get; private set; }
 
     protected Action disposeCallbacks;
     protected Action delayedCallbacks;
@@ -30,6 +54,14 @@ namespace StreamsForUnity {
       _handleParallelAction = HandleParallelAction;
     }
 
+    /// <summary>
+    /// Adds a new action to be performed
+    /// </summary>
+    /// <param name="action"> The action to be performed </param>
+    /// <param name="token"> Token for cancelling an action </param>
+    /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
     public StreamAction Add(Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
@@ -38,7 +70,14 @@ namespace StreamsForUnity {
       return streamAction;
     }
 
-    public StreamAction AddParallel(Action<float> action, StreamToken token = default) {
+    /// <summary>
+    /// Adds a new action that will be executed in parallel
+    /// </summary>
+    /// <param name="action"> The action to be performed </param>
+    /// <param name="token"> Token for cancelling an action </param>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
+    public StreamAction AddParallel([NotNull] Action<float> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new StreamAction(action, float.PositiveInfinity, token, uint.MaxValue);
@@ -46,7 +85,19 @@ namespace StreamsForUnity {
       return streamAction;
     }
 
-    public StreamAction AddTemporary(float time, Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
+    /// <summary>
+    /// Adds a new action to be performed
+    /// </summary>
+    /// <param name="time"> The time after which the action will be completed </param>
+    /// <param name="action"> The action to be performed </param>
+    /// <param name="token"> Token for cancelling an action </param>
+    /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
+    /// <remarks> It is worth distinguishing a temporary action from a timer.
+    /// A temporary action is executed every tick of the stream for a specified time,
+    /// and a timer executes the action once after the time has elapsed. </remarks>
+    public StreamAction AddTemporary(float time, [NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
       if (time <= 0) {
         Debug.LogWarning($"Time is negative or zero: {time}");
         return null;
@@ -59,8 +110,17 @@ namespace StreamsForUnity {
       return streamAction;
     }
 
+    /// <summary>
+    /// Adds a new action to be performed
+    /// </summary>
+    /// <param name="condition"> The action will be performed as long as the condition is true </param>
+    /// <param name="action"> The action to be performed </param>
+    /// <param name="token"> Token for cancelling an action </param>
+    /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
     public StreamAction AddConditional(
-      Func<bool> condition, Action<float> action, StreamToken token = default, uint priority = uint.MaxValue
+      [NotNull] Func<bool> condition, [NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue
     ) {
       ValidateAddAction(action);
       if (condition == null)
@@ -78,19 +138,45 @@ namespace StreamsForUnity {
       return streamAction;
     }
 
-    public void AddOnce(Action action, StreamToken token = default, uint priority = uint.MaxValue) {
+    /// <summary>
+    /// Adds an action for one-time execution
+    /// </summary>
+    /// <param name="action"> The action to be performed </param>
+    /// <param name="token"> Token for cancelling an action </param>
+    /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
+    public void AddOnce([NotNull] Action action, StreamToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
       actionsStorage.Add(new StreamAction(_ => action(), float.Epsilon, token, priority));
     }
 
-    public void AddOnce(Func<StreamTask> action, StreamToken token = default) {
+    /// <summary>
+    /// Adds an async action to be performed
+    /// </summary>
+    /// <param name="action"> The action to be performed </param>
+    /// <param name="token"> Token for cancelling an action </param>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
+    public void AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       actionsStorage.Add(new StreamAction(_ => action(), float.Epsilon, token, uint.MaxValue));
     }
 
-    public void AddTimer(float time, Action onComplete, StreamToken token = default) {
+    /// <summary>
+    /// Adds an action to be executed once after the specified time has passed
+    /// </summary>
+    /// <param name="time"> The time after which the action will be executed </param>
+    /// <param name="onComplete"> The action which will be executed </param>
+    /// <param name="token"> Token for cancelling a timer </param>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
+    /// <remarks> It is worth distinguishing a timer from a temporary action.
+    /// A temporary action is executed every tick of the stream for a specified time,
+    /// and a timer executes the action once after the time has elapsed. </remarks>
+    public void AddTimer(float time, [NotNull] Action onComplete, StreamToken token = default) {
       if (time <= 0) {
         Debug.LogWarning($"Time is negative or zero: {time}");
         return;
@@ -101,22 +187,36 @@ namespace StreamsForUnity {
       var streamAction = new StreamAction(_ => { }, time, token, uint.MaxValue);
       actionsStorage.Add(streamAction);
       streamAction.OnComplete(() => {
-        if (State is StreamState.Disposing or StreamState.Disposed)
+        if (State is StreamState.Terminating or StreamState.Terminated)
           return;
         AddOnce(onComplete, token);
       });
     }
 
+    /// <summary>
+    /// Adds the handler that will be called when the stream is disposed
+    /// </summary>
+    /// <param name="onDispose"> Dispose handler </param>
+    /// <exception cref="ArgumentNullException"> Threw if the passed handler is null </exception>
+    /// <remarks> If the stream has already been disposed, the handler will be called immediately </remarks>
     public void OnDispose([NotNull] Action onDispose) {
-      disposeCallbacks += onDispose ?? throw new ArgumentNullException(nameof(onDispose));
-    }
+      if (onDispose == null)
+        throw new ArgumentNullException(nameof(onDispose));
 
-    public void RemoveDisposeHandle([NotNull] Action onDispose) {
-      disposeCallbacks -= onDispose ?? throw new ArgumentNullException(nameof(onDispose));
+      if (State == StreamState.Terminated) {
+        onDispose();
+        return;
+      }
+
+      disposeCallbacks += onDispose;
     }
 
     public override string ToString() {
       return _name;
+    }
+
+    internal void RemoveDisposeHandle([NotNull] Action onDispose) {
+      disposeCallbacks -= onDispose ?? throw new ArgumentNullException(nameof(onDispose));
     }
 
     internal void Update(float deltaTime) {
@@ -139,34 +239,34 @@ namespace StreamsForUnity {
       return actionsStorage.Count != 0 || parallelActionsStorage.Count != 0;
     }
 
-    internal void Dispose_Internal() {
+    internal void Terminate() {
       switch (State) {
-        case StreamState.Disposing or StreamState.Disposed:
+        case StreamState.Terminating or StreamState.Terminated:
           return;
         case StreamState.Running:
-          delayedCallbacks += Dispose_Internal;
+          delayedCallbacks += Terminate;
           return;
       }
 
-      State = StreamState.Disposing;
+      State = StreamState.Terminating;
       actionsStorage.Clear();
       parallelActionsStorage.Clear();
       disposeCallbacks?.Invoke();
       disposeCallbacks = null;
       delayedCallbacks = null;
-      State = StreamState.Disposed;
+      State = StreamState.Terminated;
     }
 
     private void ValidateExecution() {
       switch (State) {
-        case StreamState.Disposing or StreamState.Disposed:
+        case StreamState.Terminating or StreamState.Terminated:
           throw new StreamsException("Cannot execute disposed stream");
         case StreamState.Running:
           State = StreamState.Invalid;
-          Dispose_Internal();
+          Terminate();
           throw new StreamsException("Recursive execution occurred");
         case StreamState.Invalid:
-          Dispose_Internal();
+          Terminate();
           throw new StreamsException("Stream is in invalid state");
         case StreamState.Idle:
           break;
@@ -180,7 +280,7 @@ namespace StreamsForUnity {
       Streams.PushStream(this);
       Profiler.BeginSample(_profilerName);
 
-      _worker.Start(deltaTime, parallelActionsStorage.Count, ParallelWorkStrategy, _handleParallelAction);
+      _worker.Start(deltaTime, parallelActionsStorage.Count, WorkStrategy, _handleParallelAction);
 
       for (var i = 0; i < actionsStorage.Count; i++)
         HandleAction(deltaTime, actionsStorage, i);
@@ -211,8 +311,8 @@ namespace StreamsForUnity {
 
     private void ValidateAddAction(Delegate action) {
       switch (State) {
-        case StreamState.Disposing or StreamState.Disposed:
-          throw new StreamsException("Unable to add action to disposed stream");
+        case StreamState.Terminating or StreamState.Terminated:
+          throw new StreamDisposedException(ToString());
       }
 
       if (action == null)

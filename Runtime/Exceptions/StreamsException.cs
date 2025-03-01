@@ -1,6 +1,6 @@
 using System;
 
-namespace StreamsForUnity {
+namespace StreamsForUnity.Exceptions {
 
   public class StreamsException : Exception {
 

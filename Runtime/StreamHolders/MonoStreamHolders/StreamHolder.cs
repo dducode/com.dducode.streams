@@ -4,16 +4,21 @@ using UnityEngine.SceneManagement;
 
 namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
 
-  public abstract class StreamHolderBase : MonoBehaviour {
+  public abstract class StreamHolderBase : MonoBehaviour, IStreamHolder {
 
-    public abstract ManagedExecutionStream Stream { get; }
+    public abstract ExecutionStream Stream { get; }
 
   }
 
-  public abstract class StreamHolder<TBaseSystem> : StreamHolderBase, IStreamHolder {
+  /// <summary>
+  /// MonoBehaviour component that contains and controls the associated <see cref="Stream"/>.
+  /// It exists as a game object and controls the stream's <see cref="ManagedExecutionStream.Priority"/> using the transform sibling index.
+  /// These values are closely related - when the sibling index changes, the priority changes, and vice versa
+  /// </summary>
+  public abstract class StreamHolder<TSystem> : StreamHolderBase {
 
     [SerializeField] private UpdatableBehaviour[] connectedBehaviours;
-    public override ManagedExecutionStream Stream => _stream ??= CreateStream();
+    public override ExecutionStream Stream => _stream ??= CreateStream();
 
     private readonly MonoStreamHolderFactory _streamHolderFactory = new();
     private ManagedExecutionStream _stream;
@@ -27,12 +32,8 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     private Scene _scene;
     private int _siblingIndex;
 
-    public ExecutionStream CreateNested<THolder>(string holderName = "StreamHolder") where THolder : StreamHolder<TBaseSystem> {
+    public ExecutionStream CreateNested<THolder>(string holderName = "StreamHolder") where THolder : StreamHolder<TSystem> {
       return _streamHolderFactory.Create<THolder>(_transform, holderName).Stream;
-    }
-
-    public ManagedExecutionStream Join(ManagedExecutionStream other) {
-      return _stream.Join(other);
     }
 
     public override string ToString() {
@@ -77,7 +78,7 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
       _scene = _gameObject.scene;
       _siblingIndex = _transform.GetSiblingIndex();
       _destroyHandle = new StreamTokenSource();
-      Streams.Get<TBaseSystem>().Add(AutoReconnect, _destroyHandle.Token);
+      Streams.Get<TSystem>().Add(AutoReconnect, _destroyHandle.Token);
     }
 
     private void ConnectBehaviours(ExecutionStream stream) {
@@ -93,9 +94,9 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     }
 
     private ExecutionStream GetBaseStream(Transform parent) {
-      if (parent != null && parent.TryGetComponentInParent(out StreamHolder<TBaseSystem> holder))
+      if (parent != null && parent.TryGetComponentInParent(out StreamHolder<TSystem> holder))
         return holder.Stream;
-      return _gameObject.scene.GetStream<TBaseSystem>();
+      return _gameObject.scene.GetStream<TSystem>();
     }
 
     private void AutoReconnect(float _) {

@@ -1,9 +1,14 @@
 namespace StreamsForUnity.StreamHolders {
 
+  /// <summary>
+  /// Base contract fol all stream holders
+  /// </summary>
   public interface IStreamHolder {
 
-    public ManagedExecutionStream Stream { get; }
-    public ManagedExecutionStream Join(ManagedExecutionStream other);
+    /// <summary>
+    /// The stream that is contained in the stream holder
+    /// </summary>
+    public ExecutionStream Stream { get; }
 
   }
 

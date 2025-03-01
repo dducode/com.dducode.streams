@@ -1,13 +1,26 @@
 using System;
+using StreamsForUnity.Exceptions;
 using UnityEngine;
 
 namespace StreamsForUnity {
 
+  /// <summary>
+  /// <p> The custom stream that you can control. You can <see cref="Lock">lock</see> this stream, <see cref="Join">join</see> another
+  /// stream with it, and <see cref="Reconnect">reconnect</see> to another stream. </p>
+  /// <p> You can also configure the <see cref="Priority"/> of the stream, <see cref="Delta"/> and <see cref="TickRate"/> of the stream execution </p>
+  /// </summary>
   public sealed class ManagedExecutionStream : ExecutionStream, IDisposable {
 
     public bool Locked => _lockers > 0;
+
+    /// <inheritdoc cref="StreamUnlockMode"/>
+    /// <remarks> The unlock behavior is set when the stream is created and doesn't change during the lifetime of the stream </remarks>
     public StreamUnlockMode UnlockMode { get; }
 
+    /// <summary>
+    /// Gets and sets the priority of the stream relative to other streams of the parent stream
+    /// </summary>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     public uint Priority {
       get {
         ValidateStreamState();
@@ -22,6 +35,12 @@ namespace StreamsForUnity {
       }
     }
 
+    /// <summary>
+    /// Gets and sets the stream execution delta
+    /// </summary>
+    /// <exception cref="ArgumentNullException"> Threw on get if delta isn't yet installed </exception>
+    /// <exception cref="ArgumentOutOfRangeException"> Threw on set if the passed value is negative or zero </exception>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     public float Delta {
       get {
         ValidateStreamState();
@@ -29,8 +48,8 @@ namespace StreamsForUnity {
       }
       set {
         ValidateStreamState();
-        if (value < 0f)
-          throw new ArgumentOutOfRangeException(nameof(Delta), "Delta cannot be negative");
+        if (value <= 0f)
+          throw new ArgumentOutOfRangeException(nameof(Delta), "Delta cannot be negative or zero");
         if (_delta.HasValue && Mathf.Approximately(_delta.Value, value))
           return;
 
@@ -38,6 +57,20 @@ namespace StreamsForUnity {
       }
     }
 
+    /// <returns> True if the delta has been installed </returns>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
+    public bool HasDelta {
+      get {
+        ValidateStreamState();
+        return _delta.HasValue;
+      }
+    }
+
+    /// <summary>
+    /// Gets and sets the stream execution tick rate
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"> Threw if the passed value is zero </exception>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     public uint TickRate {
       get {
         ValidateStreamState();
@@ -75,7 +108,13 @@ namespace StreamsForUnity {
       UnlockMode = unlockMode;
     }
 
+    /// <summary>
+    /// Call this to lock the stream on a token
+    /// </summary>
+    /// <seealso cref="UnlockMode"/>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     public void Lock(StreamToken lockToken) {
+      ValidateStreamState();
       switch (UnlockMode) {
         case StreamUnlockMode.WhenAll:
           _lockers++;
@@ -90,7 +129,16 @@ namespace StreamsForUnity {
       }
     }
 
+    /// <summary>
+    /// Join another stream with all its actions
+    /// </summary>
+    /// <param name="other"> The stream to be joined </param>
+    /// <returns> The returned stream depends on the priority of both - if the current stream has higher priority,
+    /// the other stream will be joined to the current one, otherwise vice versa </returns>
+    /// <exception cref="StreamsException"> Threw when one of the streams is currently running </exception>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     public ManagedExecutionStream Join(ManagedExecutionStream other) {
+      ValidateStreamState();
       if (other.Priority < Priority)
         return other.Join(this);
 
@@ -106,7 +154,14 @@ namespace StreamsForUnity {
       return this;
     }
 
+    /// <summary>
+    /// Reconnect the stream to another parent stream
+    /// </summary>
+    /// <param name="stream"> The stream in which the current one will be executed </param>
+    /// <param name="priority"> <see cref="Priority"/> </param>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     public void Reconnect(ExecutionStream stream, uint? priority = null) {
+      ValidateStreamState();
       _subscriptionHandle?.Release();
       _subscriptionHandle = new StreamTokenSource();
 
@@ -119,19 +174,24 @@ namespace StreamsForUnity {
         _execution.SetDelta(_delta.Value);
     }
 
+    /// <summary>
+    /// Reset the stream execution delta
+    /// </summary>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     public void ResetDelta() {
+      ValidateStreamState();
       _delta = null;
       _execution.ResetDelta();
     }
 
     public void Dispose() {
-      if (State is StreamState.Disposing or StreamState.Disposed)
+      if (State is StreamState.Terminating or StreamState.Terminated)
         return;
 
       _subscriptionHandle.Release();
       _subscriptionHandle = null;
       _execution = null;
-      Dispose_Internal();
+      Terminate();
     }
 
     protected override bool CanExecute() {
@@ -139,8 +199,8 @@ namespace StreamsForUnity {
     }
 
     private void ValidateStreamState() {
-      if (State is StreamState.Disposing or StreamState.Disposed)
-        throw new ObjectDisposedException(ToString());
+      if (State is StreamState.Terminating or StreamState.Terminated)
+        throw new StreamDisposedException(ToString());
     }
 
   }

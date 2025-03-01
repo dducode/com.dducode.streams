@@ -1,3 +1,5 @@
+using StreamsForUnity.Exceptions;
+
 namespace StreamsForUnity.StreamTasks.Internal {
 
   internal static class StreamTaskHelper {

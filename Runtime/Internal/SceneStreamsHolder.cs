@@ -1,22 +1,29 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 
 namespace StreamsForUnity.Internal {
 
   internal sealed class SceneStreamsHolder {
 
-    private readonly Dictionary<Type, ExecutionStream> _streams = new();
-    private readonly Dictionary<ExecutionStream, StreamAction> _executions = new();
+    private readonly Scene _scene;
+    private readonly Dictionary<Type, ManagedExecutionStream> _streams = new();
     private readonly StreamTokenSource _disposeHandle = new();
 
-    internal void AddStream<TBaseSystem>(ExecutionStream stream, StreamTokenSource disposeHandle, uint priority) {
-      _streams.Add(typeof(TBaseSystem), stream);
-      _executions.Add(stream, Streams.Get<TBaseSystem>().Add(stream.Update, disposeHandle.Token, priority));
-      _disposeHandle.Register(disposeHandle.Release);
+    public SceneStreamsHolder(Scene scene) {
+      _scene = scene;
     }
 
-    internal bool TryGetStream<TBaseSystem>(out ExecutionStream executionStream) {
-      if (_streams.TryGetValue(typeof(TBaseSystem), out ExecutionStream stream)) {
+    internal ExecutionStream CreateStream<TSystem>() {
+      uint priority = SceneManager.GetActiveScene() == _scene ? 0 : uint.MaxValue;
+      var stream = new ManagedExecutionStream(Streams.Get<TSystem>(), _scene.name, priority);
+      _streams.Add(typeof(TSystem), stream);
+      _disposeHandle.Register(stream.Dispose);
+      return stream;
+    }
+
+    internal bool TryGetStream<TSystem>(out ExecutionStream executionStream) {
+      if (_streams.TryGetValue(typeof(TSystem), out ManagedExecutionStream stream)) {
         executionStream = stream;
         return true;
       }
@@ -26,11 +33,11 @@ namespace StreamsForUnity.Internal {
     }
 
     internal void ReorderStreams(uint priority) {
-      foreach (ExecutionStream stream in _streams.Values)
-        _executions[stream].ChangePriority(priority);
+      foreach (ManagedExecutionStream stream in _streams.Values)
+        stream.Priority = priority;
     }
 
-    internal void DisposeAttachedHolders() {
+    internal void DisposeAttachedStreams() {
       _disposeHandle.Release();
       _streams.Clear();
     }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using StreamsForUnity.Exceptions;
 using StreamsForUnity.StreamTasks;
 using StreamsForUnity.StreamTasks.Extensions;
 using StreamsForUnity.Tests.Attributes;

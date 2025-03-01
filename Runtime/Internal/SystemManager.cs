@@ -1,4 +1,5 @@
 using System;
+using StreamsForUnity.Exceptions;
 using UnityEngine.LowLevel;
 
 namespace StreamsForUnity.Internal {

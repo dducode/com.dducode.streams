@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
+using StreamsForUnity.Exceptions;
 using StreamsForUnity.Internal;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
@@ -13,21 +14,32 @@ namespace StreamsForUnity {
 
   public static class Streams {
 
-    [CanBeNull] public static ExecutionStream RunningStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
+    /// <summary>
+    /// Gets the currently running stream. If you try to get this outside of any stream, you'll get null
+    /// </summary>
+    [CanBeNull]
+    public static ExecutionStream RunningStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
 
     private static readonly Dictionary<Type, ExecutionStream> _connectedStreams = new();
     private static readonly Stack<ExecutionStream> _streamsStack = new();
     private static StreamTokenSource _streamsCancellation = new();
 
-    static Streams() {
 #if UNITY_EDITOR
+    static Streams() {
       EditorApplication.playModeStateChanged += state => {
         if (state == PlayModeStateChange.ExitingPlayMode)
           DisposeAllStreams();
       };
-#endif
     }
+#endif
 
+    /// <summary>
+    /// Gets the base stream in the specified player loop system
+    /// </summary>
+    /// <typeparam name="TSystem"> The system that contains the stream </typeparam>
+    /// <returns> Existing stream or new </returns>
+    /// <exception cref="StreamsException"> (Editor only) Threw when trying to get a stream when the editor isn't playing </exception>
+    /// <remarks> Three streams are always created at system startup (in the <see cref="Update"/>, <see cref="FixedUpdate"/> and <see cref="PreLateUpdate"/> systems) </remarks>
     public static ExecutionStream Get<TSystem>() {
 #if UNITY_EDITOR
       if (!EditorApplication.isPlaying)
@@ -55,7 +67,7 @@ namespace StreamsForUnity {
 
     private static ExecutionStream CreateStream<TSystem>() {
       var stream = new ExecutionStream(NamesUtility.CreateProfilerSampleName(typeof(TSystem)));
-      _streamsCancellation.Register(stream.Dispose_Internal);
+      _streamsCancellation.Register(stream.Terminate);
 
       Type systemType = typeof(TSystem);
       _connectedStreams.Add(systemType, stream);

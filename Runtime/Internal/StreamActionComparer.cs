@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using StreamsForUnity.Exceptions;
 
 namespace StreamsForUnity.Internal {
 

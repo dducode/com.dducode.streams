@@ -5,14 +5,16 @@ using JetBrains.Annotations;
 
 namespace StreamsForUnity.StreamStateMachine {
 
-  public class StateMachine<TBaseSystem> : IStateMachine {
+  /// <summary>
+  /// The finite state machine that allows you to control multiple streams as states
+  /// </summary>
+  public class StateMachine<TSystem> : IStateMachine {
 
     public State CurrentState { get; private set; }
 
     private readonly Dictionary<Type, State> _states;
     private readonly StreamTokenSource _disposeHandle;
     private StreamTokenSource _stateCancelling = new();
-    private bool _entering;
 
     public StateMachine([NotNull] params State[] states) {
       if (states == null)
@@ -23,7 +25,8 @@ namespace StreamsForUnity.StreamStateMachine {
       _states = states.ToDictionary(keySelector: state => state.GetType(), elementSelector: state => state);
       _disposeHandle = new StreamTokenSource();
       foreach (State state in states)
-        state.Initialize<TBaseSystem>(this, _disposeHandle.Token);
+        state.Initialize<TSystem>(this, _disposeHandle.Token);
+      EnterToState(states.First());
     }
 
     public void SetState<TState>() where TState : State {
@@ -42,7 +45,7 @@ namespace StreamsForUnity.StreamStateMachine {
 
     private void ExitFromCurrentState() {
       _stateCancelling.Release();
-      CurrentState?.Exit();
+      CurrentState.Exit();
     }
 
     private void EnterToState(State state) {

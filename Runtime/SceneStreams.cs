@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using StreamsForUnity.Exceptions;
 using StreamsForUnity.Internal;
 using StreamsForUnity.StreamHolders;
+using StreamsForUnity.StreamHolders.MonoStreamHolders;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -11,37 +13,39 @@ namespace StreamsForUnity {
     private static readonly Dictionary<Scene, SceneStreamsHolder> _streamsHolders = new();
     private static readonly MonoStreamHolderFactory _streamHolderFactory = new();
 
-    public static ExecutionStream GetStream<TBaseSystem>(this Scene scene) {
+    /// <summary>
+    /// Gets the stream attached to the current scene and running on the specified system
+    /// </summary>
+    /// <returns> Existing stream or new </returns>
+    /// <exception cref="StreamsException"> Threw if the scene is invalid </exception>
+    public static ExecutionStream GetStream<TSystem>(this Scene scene) {
       if (!scene.IsValid())
         throw new StreamsException($"Cannot get stream from invalid scene ({scene})");
-      if (TryGetStream<TBaseSystem>(scene, out ExecutionStream stream))
-        return stream;
-
-      var disposeHandle = new StreamTokenSource();
-      var newStream = new ExecutionStream(scene.name);
-      disposeHandle.Register(newStream.Dispose_Internal);
-
-      RegisterStreamRunner<TBaseSystem>(scene, newStream, disposeHandle, SceneManager.GetActiveScene() == scene ? 0 : uint.MaxValue);
-      return newStream;
+      return TryGetStream<TSystem>(scene, out ExecutionStream stream)
+        ? stream
+        : CreateNewStream<TSystem>(scene);
     }
 
-    public static ExecutionStream CreateNestedStream<THolder>(this Scene scene, string streamName = "StreamHolder")
+    /// <summary>
+    /// Creates the new <see cref="StreamHolder{TSystem}">stream holder</see> and return its stream
+    /// </summary>
+    public static ExecutionStream CreateNestedStream<THolder>(this Scene scene, string holderName = "StreamHolder")
       where THolder : MonoBehaviour, IStreamHolder {
-      return _streamHolderFactory.Create<THolder>(scene, streamName).Stream;
+      return _streamHolderFactory.Create<THolder>(scene, holderName).Stream;
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Initialize() {
       SceneManager.sceneUnloaded += DisposeAttachedStreamsOnSceneUnloaded;
       SceneManager.activeSceneChanged += ReorderStreams;
-      Application.quitting += DisposeAllRunners;
+      Application.quitting += DisposeAllHolders;
     }
 
     private static void DisposeAttachedStreamsOnSceneUnloaded(Scene scene) {
       if (!_streamsHolders.TryGetValue(scene, out SceneStreamsHolder holder))
         return;
 
-      holder.DisposeAttachedHolders();
+      holder.DisposeAttachedStreams();
       _streamsHolders.Remove(scene);
     }
 
@@ -55,19 +59,19 @@ namespace StreamsForUnity {
         secondHolder.ReorderStreams(0);
     }
 
-    private static void DisposeAllRunners() {
+    private static void DisposeAllHolders() {
       foreach (SceneStreamsHolder holder in _streamsHolders.Values)
-        holder.DisposeAttachedHolders();
+        holder.DisposeAttachedStreams();
       _streamsHolders.Clear();
 
       SceneManager.sceneUnloaded -= DisposeAttachedStreamsOnSceneUnloaded;
       SceneManager.activeSceneChanged -= ReorderStreams;
-      Application.quitting -= DisposeAllRunners;
+      Application.quitting -= DisposeAllHolders;
     }
 
-    private static bool TryGetStream<TBaseSystem>(Scene scene, out ExecutionStream executionStream) {
+    private static bool TryGetStream<TSystem>(Scene scene, out ExecutionStream executionStream) {
       if (_streamsHolders.TryGetValue(scene, out SceneStreamsHolder holder)) {
-        if (holder.TryGetStream<TBaseSystem>(out ExecutionStream stream)) {
+        if (holder.TryGetStream<TSystem>(out ExecutionStream stream)) {
           executionStream = stream;
           return true;
         }
@@ -77,10 +81,10 @@ namespace StreamsForUnity {
       return false;
     }
 
-    private static void RegisterStreamRunner<TBaseSystem>(Scene scene, ExecutionStream stream, StreamTokenSource disposeHandle, uint priority) {
+    private static ExecutionStream CreateNewStream<TSystem>(Scene scene) {
       if (!_streamsHolders.ContainsKey(scene))
-        _streamsHolders.Add(scene, new SceneStreamsHolder());
-      _streamsHolders[scene].AddStream<TBaseSystem>(stream, disposeHandle, priority);
+        _streamsHolders.Add(scene, new SceneStreamsHolder(scene));
+      return _streamsHolders[scene].CreateStream<TSystem>();
     }
 
   }

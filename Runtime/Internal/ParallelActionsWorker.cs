@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using JetBrains.Annotations;
+using StreamsForUnity.Exceptions;
 
 namespace StreamsForUnity.Internal {
 
@@ -31,7 +32,7 @@ namespace StreamsForUnity.Internal {
 
       int workersCount = strategy switch {
         ParallelWorkStrategy.Economy => Math.Min(Math.Max(1, (int)MathF.Log(iterations)), FixedThreadPool.AvailableThreads),
-        ParallelWorkStrategy.Effectively => Math.Min(Math.Max(1, (int)MathF.Sqrt(iterations)), FixedThreadPool.AvailableThreads),
+        ParallelWorkStrategy.Optimal => Math.Min(Math.Max(1, (int)MathF.Sqrt(iterations)), FixedThreadPool.AvailableThreads),
         ParallelWorkStrategy.Performance => Math.Min(iterations, FixedThreadPool.AvailableThreads),
         _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, null)
       };
