@@ -6,12 +6,22 @@ using StreamsForUnity.StreamHolders.MonoStreamHolders;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 namespace StreamsForUnity {
 
   public static class SceneStreams {
 
     private static readonly Dictionary<Scene, SceneStreamsHolder> _streamsHolders = new();
     private static readonly MonoStreamHolderFactory _streamHolderFactory = new();
+
+#if UNITY_EDITOR
+    static SceneStreams() {
+      EditorApplication.playModeStateChanged += OnPlayModeStateChange;
+    }
+#endif
 
     /// <summary>
     /// Gets the stream attached to the current scene and running on the specified system
@@ -38,7 +48,6 @@ namespace StreamsForUnity {
     private static void Initialize() {
       SceneManager.sceneUnloaded += DisposeAttachedStreamsOnSceneUnloaded;
       SceneManager.activeSceneChanged += ReorderStreams;
-      Application.quitting += DisposeAllHolders;
     }
 
     private static void DisposeAttachedStreamsOnSceneUnloaded(Scene scene) {
@@ -59,15 +68,19 @@ namespace StreamsForUnity {
         secondHolder.ReorderStreams(0);
     }
 
-    private static void DisposeAllHolders() {
+#if UNITY_EDITOR
+    private static void OnPlayModeStateChange(PlayModeStateChange state) {
+      if (state != PlayModeStateChange.ExitingPlayMode)
+        return;
+
       foreach (SceneStreamsHolder holder in _streamsHolders.Values)
         holder.DisposeAttachedStreams();
       _streamsHolders.Clear();
 
       SceneManager.sceneUnloaded -= DisposeAttachedStreamsOnSceneUnloaded;
       SceneManager.activeSceneChanged -= ReorderStreams;
-      Application.quitting -= DisposeAllHolders;
     }
+#endif
 
     private static bool TryGetStream<TSystem>(Scene scene, out ExecutionStream executionStream) {
       if (_streamsHolders.TryGetValue(scene, out SceneStreamsHolder holder)) {

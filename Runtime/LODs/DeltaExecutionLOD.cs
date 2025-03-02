@@ -1,3 +1,4 @@
+using StreamsForUnity.StreamActions;
 using UnityEngine;
 
 namespace StreamsForUnity.LODs {
@@ -6,7 +7,7 @@ namespace StreamsForUnity.LODs {
   [DisallowMultipleComponent]
   public sealed class DeltaExecutionLOD : ExecutionLOD<float> {
 
-    protected override void SetValue(StreamAction action, float value) {
+    protected override void SetValue(PersistentStreamAction action, float value) {
       action.SetDelta(value);
     }
 

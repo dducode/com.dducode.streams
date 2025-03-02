@@ -12,7 +12,7 @@ namespace StreamsForUnity.StreamTasks {
     public static StreamTask CompletedTask { get; } = new() { IsCompleted = true };
     public bool IsCompleted { get; private set; }
 
-    internal Exception Error { get; private set; }
+    [CanBeNull] internal Exception Error { get; private set; }
     private readonly Queue<Action> _continuations = new();
 
     internal StreamTask() {

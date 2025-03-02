@@ -13,7 +13,6 @@ namespace StreamsForUnity.StreamTasks {
 
     public bool IsCompleted => _task.IsCompleted;
 
-
     public void OnCompleted(Action continuation) {
       _task.ContinueWith(continuation);
     }

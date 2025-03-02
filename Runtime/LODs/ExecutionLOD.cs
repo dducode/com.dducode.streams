@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using StreamsForUnity.StreamActions;
 using StreamsForUnity.StreamHolders.MonoStreamHolders;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
@@ -41,7 +42,7 @@ namespace StreamsForUnity.LODs {
       }
     }
 
-    protected abstract void SetValue(StreamAction action, TValue value);
+    protected abstract void SetValue(PersistentStreamAction action, TValue value);
 
     private void UpdateLevels() {
       Camera currentCamera = Camera.current ?? Camera.main;

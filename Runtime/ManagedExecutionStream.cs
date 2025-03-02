@@ -1,5 +1,6 @@
 using System;
 using StreamsForUnity.Exceptions;
+using StreamsForUnity.StreamActions;
 using UnityEngine;
 
 namespace StreamsForUnity {
@@ -31,7 +32,7 @@ namespace StreamsForUnity {
         if (_priority == value)
           return;
 
-        _execution.ChangePriority(_priority = value);
+        _execution.Priority = _priority = value;
       }
     }
 
@@ -92,7 +93,7 @@ namespace StreamsForUnity {
     private uint _tickRate = 1;
     private StreamTokenSource _subscriptionHandle;
     private ExecutionStream _baseStream;
-    private StreamAction _execution;
+    private PersistentStreamAction _execution;
     private int _lockers;
 
     public ManagedExecutionStream(
@@ -104,7 +105,7 @@ namespace StreamsForUnity {
       _subscriptionHandle = new StreamTokenSource();
       _baseStream = baseStream;
       _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority = priority);
-      _baseStream.OnDispose(Dispose);
+      _baseStream.OnTerminate += Dispose;
       UnlockMode = unlockMode;
     }
 
@@ -146,10 +147,7 @@ namespace StreamsForUnity {
       if (runningStream == this || runningStream == other)
         throw new StreamsException($"Cannot join a running stream ({runningStream})");
 
-      actionsStorage.Join(other.actionsStorage);
-      parallelActionsStorage.Join(other.parallelActionsStorage);
-      delayedCallbacks += other.delayedCallbacks;
-      disposeCallbacks += other.disposeCallbacks;
+      CopyFrom(other);
       other.Dispose();
       return this;
     }
@@ -165,10 +163,10 @@ namespace StreamsForUnity {
       _subscriptionHandle?.Release();
       _subscriptionHandle = new StreamTokenSource();
 
-      _baseStream.RemoveDisposeHandle(Dispose);
+      _baseStream.OnTerminate -= Dispose;
+      _execution = stream.Add(Update, _subscriptionHandle.Token, _priority = priority ?? _priority).SetTickRate(_tickRate);
+      stream.OnTerminate += Dispose;
       _baseStream = stream;
-      _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority = priority ?? _priority).SetTickRate(_tickRate);
-      _baseStream.OnDispose(Dispose);
 
       if (_delta.HasValue)
         _execution.SetDelta(_delta.Value);

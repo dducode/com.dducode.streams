@@ -2,7 +2,6 @@ using System;
 using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
 using StreamsForUnity.StreamTasks.Internal;
-using UnityEngine;
 
 namespace StreamsForUnity.StreamTasks {
 
@@ -35,20 +34,22 @@ namespace StreamsForUnity.StreamTasks {
     public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine {
       Task ??= new StreamTask();
-      _onCompleted ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine).Run;
+      _onCompleted ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine, Task).Run;
       awaiter.OnCompleted(_onCompleted);
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine {
       Task ??= new StreamTask();
-      _onCompleted ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine).Run;
+      _onCompleted ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine, Task).Run;
       awaiter.UnsafeOnCompleted(_onCompleted);
     }
 
     public void SetException(Exception exception) {
-      Debug.LogError("Unhandled error was occurred");
-      Debug.LogException(exception);
+      if (Task == null)
+        throw exception;
+
+      Task.SetException(exception);
     }
 
   }

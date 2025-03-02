@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using StreamsForUnity.StreamActions;
 
 namespace StreamsForUnity.Internal {
 
@@ -21,10 +22,11 @@ namespace StreamsForUnity.Internal {
       if (!_pendingAddActions.Contains(action))
         _pendingAddActions.Enqueue(action);
 
-      action.OnPriorityChanged += () => _dirty = true;
       Action remove = () => Remove(action);
-      action.OnComplete(remove);
-      action.OnCancel(remove);
+      action.OnPriorityChanged += () => _dirty = true;
+      action.OnCancel += remove;
+      if (action is ICompletable completable)
+        completable.OnComplete += remove;
     }
 
     public void Remove(StreamAction action) {
@@ -40,11 +42,10 @@ namespace StreamsForUnity.Internal {
       }
     }
 
-    public void Join(ActionsStorage otherStorage) {
-      otherStorage.Refresh();
-      foreach (StreamAction action in otherStorage)
-        Add(action);
-      otherStorage.Clear();
+    public void CopyFrom(ActionsStorage other) {
+      foreach (StreamAction action in other)
+        _actions.Add(action);
+      _actions.Sort(_comparer);
     }
 
     public Enumerator GetEnumerator() {

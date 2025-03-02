@@ -1,4 +1,5 @@
 using StreamsForUnity.Internal.Extensions;
+using StreamsForUnity.StreamActions;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -15,7 +16,7 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
   /// It exists as a game object and controls the stream's <see cref="ManagedExecutionStream.Priority"/> using the transform sibling index.
   /// These values are closely related - when the sibling index changes, the priority changes, and vice versa
   /// </summary>
-  public abstract class StreamHolder<TSystem> : StreamHolderBase {
+  public abstract class StreamHolder<TSystem> : StreamHolderBase, IConfigurable<StreamHolder<TSystem>>, IJoinable<StreamHolder<TSystem>> {
 
     [SerializeField] private UpdatableBehaviour[] connectedBehaviours;
     public override ExecutionStream Stream => _stream ??= CreateStream();
@@ -36,6 +37,29 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
       return _streamHolderFactory.Create<THolder>(_transform, holderName).Stream;
     }
 
+    public StreamHolder<TSystem> SetDelta(float value) {
+      _stream.Delta = value;
+      return this;
+    }
+
+    public StreamHolder<TSystem> ResetDelta() {
+      _stream.ResetDelta();
+      return this;
+    }
+
+    public StreamHolder<TSystem> SetTickRate(uint value) {
+      _stream.TickRate = value;
+      return this;
+    }
+
+    public StreamHolder<TSystem> Join(StreamHolder<TSystem> other) {
+      if (other._stream.Priority < _stream.Priority)
+        return other.Join(this);
+
+      _stream.Join(other._stream);
+      return this;
+    }
+
     public override string ToString() {
       return gameObject.name;
     }
@@ -50,6 +74,8 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     }
 
     private void OnDisable() {
+      if (_stream.State == StreamState.Terminating)
+        return;
       _lockHandle = new StreamTokenSource();
       _stream.Lock(_lockHandle.Token);
     }
@@ -61,11 +87,11 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     private ManagedExecutionStream CreateStream() {
       Initialize();
       var stream = new ManagedExecutionStream(GetBaseStream(_parent), _gameObject.name, (uint)_siblingIndex);
-      stream.OnDispose(() => {
+      stream.OnTerminate += () => {
         if (_destroyHandle.Released)
           return;
         Destroy(gameObject);
-      });
+      };
       _destroyHandle.Register(stream.Dispose);
       ConnectBehaviours(stream);
       return stream;

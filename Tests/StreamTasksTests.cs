@@ -249,6 +249,18 @@ namespace StreamsForUnity.Tests {
       Assert.IsTrue(await tcs.Task);
     }
 
+    [Test, StreamTasks]
+    public async Task AsyncOnCompleteTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      SetFailureAfterTime(1, tcs);
+
+      Streams.Get<Update>().AddOnce(async () => {
+        await StreamTask.Delay(500);
+      }).OnComplete += () => tcs.SetResult(true);
+
+      Assert.IsTrue(await tcs.Task);
+    }
+
     private void SetFailureAfterTime(float time, TaskCompletionSource<bool> tcs) {
       Streams.Get<Update>().AddTimer(time, () => tcs.SetResult(false));
     }

@@ -27,8 +27,10 @@ namespace StreamsForUnity {
 #if UNITY_EDITOR
     static Streams() {
       EditorApplication.playModeStateChanged += state => {
-        if (state == PlayModeStateChange.ExitingPlayMode)
-          DisposeAllStreams();
+        if (state == PlayModeStateChange.ExitingPlayMode) {
+          _streamsCancellation.Release();
+          _connectedStreams.Clear();
+        }
       };
     }
 #endif
@@ -73,16 +75,11 @@ namespace StreamsForUnity {
       _connectedStreams.Add(systemType, stream);
       StreamConnector.Connect<TSystem>(stream);
 
-      stream.OnDispose(() => {
+      stream.OnTerminate += () => {
         _connectedStreams.Remove(systemType);
         StreamConnector.DisconnectStreamAt<TSystem>();
-      });
+      };
       return stream;
-    }
-
-    private static void DisposeAllStreams() {
-      _streamsCancellation.Release();
-      _connectedStreams.Clear();
     }
 
   }

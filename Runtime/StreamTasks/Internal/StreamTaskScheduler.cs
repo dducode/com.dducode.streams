@@ -19,10 +19,15 @@ namespace StreamsForUnity.StreamTasks.Internal {
         return;
       }
 
-      if (queue.TryDequeue(out StreamTask task))
-        task.SetResult();
-      else
+      if (queue.TryDequeue(out StreamTask task)) {
+        if (parentTask.Error == null)
+          task.SetResult();
+        else
+          task.SetException(parentTask.Error);
+      }
+      else {
         _tasksSequence.Remove(parentTask);
+      }
     }
 
   }
