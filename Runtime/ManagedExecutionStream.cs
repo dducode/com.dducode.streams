@@ -105,7 +105,7 @@ namespace StreamsForUnity {
       _subscriptionHandle = new StreamTokenSource();
       _baseStream = baseStream;
       _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority = priority);
-      _baseStream.OnTerminate += Dispose;
+      _baseStream.OnTerminate(Dispose, _subscriptionHandle.Token);
       UnlockMode = unlockMode;
     }
 
@@ -163,10 +163,9 @@ namespace StreamsForUnity {
       _subscriptionHandle?.Release();
       _subscriptionHandle = new StreamTokenSource();
 
-      _baseStream.OnTerminate -= Dispose;
-      _execution = stream.Add(Update, _subscriptionHandle.Token, _priority = priority ?? _priority).SetTickRate(_tickRate);
-      stream.OnTerminate += Dispose;
       _baseStream = stream;
+      _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority = priority ?? _priority).SetTickRate(_tickRate);
+      _baseStream.OnTerminate(Dispose, _subscriptionHandle.Token);
 
       if (_delta.HasValue)
         _execution.SetDelta(_delta.Value);

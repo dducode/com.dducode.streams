@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace StreamsForUnity.StreamActions {
+namespace StreamsForUnity.StreamActions.Components {
 
   internal class Configuration {
 

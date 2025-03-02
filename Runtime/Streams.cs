@@ -75,10 +75,10 @@ namespace StreamsForUnity {
       _connectedStreams.Add(systemType, stream);
       StreamConnector.Connect<TSystem>(stream);
 
-      stream.OnTerminate += () => {
+      stream.OnTerminate(() => {
         _connectedStreams.Remove(systemType);
         StreamConnector.DisconnectStreamAt<TSystem>();
-      };
+      });
       return stream;
     }
 

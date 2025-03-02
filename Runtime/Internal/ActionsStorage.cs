@@ -24,9 +24,9 @@ namespace StreamsForUnity.Internal {
 
       Action remove = () => Remove(action);
       action.OnPriorityChanged += () => _dirty = true;
-      action.OnCancel += remove;
+      action.OnCancel(remove);
       if (action is ICompletable completable)
-        completable.OnComplete += remove;
+        completable.OnComplete(remove);
     }
 
     public void Remove(StreamAction action) {

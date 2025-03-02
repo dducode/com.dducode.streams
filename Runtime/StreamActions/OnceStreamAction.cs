@@ -1,13 +1,9 @@
 using System;
+using StreamsForUnity.StreamActions.Components;
 
 namespace StreamsForUnity.StreamActions {
 
   public sealed class OnceStreamAction : StreamAction, ICompletable {
-
-    public event Action OnComplete {
-      add => _completion.OnComplete += value;
-      remove => _completion.OnComplete -= value;
-    }
 
     private protected override Delegate Action => _action;
 
@@ -16,6 +12,10 @@ namespace StreamsForUnity.StreamActions {
 
     internal OnceStreamAction(Action action, StreamToken cancellationToken, uint priority) : base(cancellationToken, priority) {
       _action = action;
+    }
+
+    public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
+      _completion.OnComplete(onComplete, subscriptionToken);
     }
 
     internal override void Invoke(float deltaTime) {

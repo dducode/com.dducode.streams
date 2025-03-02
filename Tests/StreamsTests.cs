@@ -39,7 +39,7 @@ namespace StreamsForUnity.Tests {
 
       Streams.Get<Update>().AddTemporal(2, delta => {
         Debug.Log(delta);
-      }).SetDelta(0.5f).OnComplete += () => tcs.SetResult(true);
+      }).SetDelta(0.5f).OnComplete(() => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -50,7 +50,7 @@ namespace StreamsForUnity.Tests {
 
       Streams.Get<FixedUpdate>().AddTemporal(0.2f, delta => {
         Debug.Log(delta);
-      }).SetDelta(0.002f).OnComplete += () => tcs.SetResult(true);
+      }).SetDelta(0.002f).OnComplete(() => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -63,7 +63,7 @@ namespace StreamsForUnity.Tests {
       Streams.Get<Update>()
         .AddConditional(() => !completionHandle.Released, delta => Debug.Log(delta))
         .SetDelta(0.1f)
-        .OnComplete += () => tcs.SetResult(true);
+        .OnComplete(() => tcs.SetResult(true));
 
       Streams.Get<Update>().AddTimer(2, () => completionHandle.Release());
       Assert.IsTrue(await tcs.Task);

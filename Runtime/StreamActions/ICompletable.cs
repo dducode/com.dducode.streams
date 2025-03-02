@@ -1,10 +1,11 @@
 using System;
+using JetBrains.Annotations;
 
 namespace StreamsForUnity.StreamActions {
 
   public interface ICompletable {
 
-    public event Action OnComplete;
+    public void OnComplete([NotNull] Action onComplete, StreamToken subscriptionToken = default);
 
   }
 

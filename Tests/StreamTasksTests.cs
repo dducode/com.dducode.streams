@@ -256,7 +256,7 @@ namespace StreamsForUnity.Tests {
 
       Streams.Get<Update>().AddOnce(async () => {
         await StreamTask.Delay(500);
-      }).OnComplete += () => tcs.SetResult(true);
+      }).OnComplete(() => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);
     }

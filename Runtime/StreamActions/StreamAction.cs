@@ -1,4 +1,5 @@
 using System;
+using JetBrains.Annotations;
 
 namespace StreamsForUnity.StreamActions {
 
@@ -26,23 +27,35 @@ namespace StreamsForUnity.StreamActions {
       }
     }
 
-    public event Action OnCancel {
-      add => _cancelCallbacks += value ?? throw new ArgumentNullException(nameof(value));
-      remove => _cancelCallbacks -= value ?? throw new ArgumentNullException(nameof(value));
-    }
-
     internal event Action OnPriorityChanged;
     private protected abstract Delegate Action { get; }
     private string ActionName => Action.Method.Name;
 
     private Action _cancelCallbacks;
-    private string _name = nameof(StreamAction);
+    private string _name;
     private bool _canceled;
     private uint _priority;
 
     private protected StreamAction(StreamToken cancellationToken, uint priority) {
       cancellationToken.Register(() => _canceled = true);
       _priority = priority;
+      _name = GetType().Name;
+    }
+
+    public void OnCancel([NotNull] Action onCancel, StreamToken subscriptionToken = default) {
+      if (onCancel == null)
+        throw new ArgumentNullException(nameof(onCancel));
+
+      if (subscriptionToken.Released)
+        return;
+
+      if (_canceled) {
+        onCancel();
+        return;
+      }
+
+      _cancelCallbacks += onCancel;
+      subscriptionToken.Register(() => _cancelCallbacks -= onCancel);
     }
 
     public override string ToString() {

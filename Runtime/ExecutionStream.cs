@@ -37,34 +37,6 @@ namespace StreamsForUnity {
     /// <inheritdoc cref="StreamState"/>
     public StreamState State { get; private set; }
 
-    /// <summary>
-    /// Adds the handler that will be called when the stream is terminated
-    /// </summary>
-    /// <exception cref="ArgumentNullException"> Threw if the passed handler is null </exception>
-    /// <remarks> If the stream has already been disposed, the handler will be called immediately </remarks>
-    public event Action OnTerminate {
-      add {
-        if (value == null)
-          throw new ArgumentNullException(nameof(value));
-
-        if (State == StreamState.Terminated) {
-          value();
-          return;
-        }
-
-        _terminateCallbacks += value;
-      }
-      remove {
-        if (value == null)
-          throw new ArgumentNullException(nameof(value));
-
-        if (State == StreamState.Terminated)
-          return;
-
-        _terminateCallbacks -= value;
-      }
-    }
-
     private Action _terminateCallbacks;
     private Action _delayedCallbacks;
 
@@ -211,6 +183,27 @@ namespace StreamsForUnity {
       var streamAction = new StreamTimer(time, onComplete, token);
       _actionsStorage.Add(streamAction);
       return streamAction;
+    }
+
+    /// <summary>
+    /// Adds the handler that will be called when the stream is terminated
+    /// </summary>
+    /// <exception cref="ArgumentNullException"> Threw if the passed handler is null </exception>
+    /// <remarks> If the stream has already been disposed, the handler will be called immediately </remarks>
+    public void OnTerminate([NotNull] Action onTermination, StreamToken subscriptionToken = default) {
+      if (onTermination == null)
+        throw new ArgumentNullException(nameof(onTermination));
+
+      if (subscriptionToken.Released)
+        return;
+
+      if (State == StreamState.Terminated) {
+        onTermination();
+        return;
+      }
+
+      _terminateCallbacks += onTermination;
+      subscriptionToken.Register(() => _terminateCallbacks -= onTermination);
     }
 
     public override string ToString() {

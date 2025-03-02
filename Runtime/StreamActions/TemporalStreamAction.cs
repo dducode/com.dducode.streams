@@ -1,14 +1,10 @@
 using System;
+using StreamsForUnity.StreamActions.Components;
 using UnityEngine;
 
 namespace StreamsForUnity.StreamActions {
 
   public sealed class TemporalStreamAction : StreamAction, IConfigurable<TemporalStreamAction>, ICompletable {
-
-    public event Action OnComplete {
-      add => _completion.OnComplete += value;
-      remove => _completion.OnComplete -= value;
-    }
 
     private protected override Delegate Action => _action;
 
@@ -41,6 +37,10 @@ namespace StreamsForUnity.StreamActions {
     public TemporalStreamAction SetTickRate(uint value) {
       _configuration.TickRate = value;
       return this;
+    }
+
+    public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
+      _completion.OnComplete(onComplete, subscriptionToken);
     }
 
     internal override void Invoke(float deltaTime) {

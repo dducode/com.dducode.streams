@@ -87,11 +87,7 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     private ManagedExecutionStream CreateStream() {
       Initialize();
       var stream = new ManagedExecutionStream(GetBaseStream(_parent), _gameObject.name, (uint)_siblingIndex);
-      stream.OnTerminate += () => {
-        if (_destroyHandle.Released)
-          return;
-        Destroy(gameObject);
-      };
+      stream.OnTerminate(() => Destroy(gameObject), _destroyHandle.Token);
       _destroyHandle.Register(stream.Dispose);
       ConnectBehaviours(stream);
       return stream;
@@ -104,7 +100,7 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
       _scene = _gameObject.scene;
       _siblingIndex = _transform.GetSiblingIndex();
       _destroyHandle = new StreamTokenSource();
-      Streams.Get<TSystem>().Add(AutoReconnect, _destroyHandle.Token);
+      _scene.GetStream<TSystem>().Add(AutoReconnect, _destroyHandle.Token);
     }
 
     private void ConnectBehaviours(ExecutionStream stream) {
@@ -122,7 +118,7 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
     private ExecutionStream GetBaseStream(Transform parent) {
       if (parent != null && parent.TryGetComponentInParent(out StreamHolder<TSystem> holder))
         return holder.Stream;
-      return _gameObject.scene.GetStream<TSystem>();
+      return _scene.GetStream<TSystem>();
     }
 
     private void AutoReconnect(float _) {
