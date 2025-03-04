@@ -114,7 +114,7 @@ namespace StreamsForUnity {
     /// <summary>
     /// Adds a new action to be performed
     /// </summary>
-    /// <param name="condition"> The action will be performed as long as the condition is true </param>
+    /// <param name="condition"> The action will be performed when the condition is true </param>
     /// <param name="action"> The action to be performed </param>
     /// <param name="token"> Token for cancelling an action </param>
     /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>

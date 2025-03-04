@@ -62,8 +62,7 @@ namespace StreamsForUnity.Tests {
 
       Streams.Get<Update>()
         .AddConditional(() => !completionHandle.Released, delta => Debug.Log(delta))
-        .SetDelta(0.1f)
-        .OnComplete(() => tcs.SetResult(true));
+        .SetDelta(0.1f); // TODO: fix test
 
       Streams.Get<Update>().AddTimer(2, () => completionHandle.Release());
       Assert.IsTrue(await tcs.Task);

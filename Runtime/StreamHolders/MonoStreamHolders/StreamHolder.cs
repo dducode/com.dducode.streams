@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using StreamsForUnity.Attributes;
 using StreamsForUnity.Internal.Extensions;
 using StreamsForUnity.StreamActions;
 using UnityEngine;
@@ -5,21 +10,16 @@ using UnityEngine.SceneManagement;
 
 namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
 
-  public abstract class StreamHolderBase : MonoBehaviour, IStreamHolder {
-
-    public abstract ExecutionStream Stream { get; }
-
-  }
-
   /// <summary>
   /// MonoBehaviour component that contains and controls the associated <see cref="Stream"/>.
   /// It exists as a game object and controls the stream's <see cref="ManagedExecutionStream.Priority"/> using the transform sibling index.
   /// These values are closely related - when the sibling index changes, the priority changes, and vice versa
   /// </summary>
-  public abstract class StreamHolder<TSystem> : StreamHolderBase, IConfigurable<StreamHolder<TSystem>>, IJoinable<StreamHolder<TSystem>> {
+  public abstract class StreamHolder<TSystem> : MonoBehaviour, IStreamHolder, IConfigurable<StreamHolder<TSystem>>, IJoinable<StreamHolder<TSystem>> {
 
-    [SerializeField] private UpdatableBehaviour[] connectedBehaviours;
-    public override ExecutionStream Stream => _stream ??= CreateStream();
+    [SerializeField] private bool searchInHierarchy;
+    [SerializeField] private MonoBehaviour[] connectedBehaviours;
+    public ExecutionStream Stream => _stream ??= CreateStream();
 
     private readonly MonoStreamHolderFactory _streamHolderFactory = new();
     private ManagedExecutionStream _stream;
@@ -107,11 +107,18 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
       if (connectedBehaviours == null)
         return;
 
-      foreach (UpdatableBehaviour behaviour in connectedBehaviours) {
-        if (behaviour.RunOnBackgroundThread)
-          stream.AddParallel(behaviour.UpdateFunction, behaviour.destroyCancellationToken);
-        else
-          stream.Add(behaviour.UpdateFunction, behaviour.destroyCancellationToken);
+      HashSet<MonoBehaviour> behaviours = connectedBehaviours.Where(behaviour => behaviour != null).ToHashSet();
+
+      if (searchInHierarchy)
+        SearchBehaviours(behaviours, _transform);
+
+      foreach (MonoBehaviour behaviour in behaviours) {
+        MethodInfo[] methods = behaviour
+          .GetType()
+          .GetMethods(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+
+        AddPersistentActions(stream, behaviour, methods);
+        AddParallelActions(stream, behaviour, methods);
       }
     }
 
@@ -148,6 +155,60 @@ namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
 
     private int GetMaxObjectsInHierarchy() {
       return _parent != null ? _parent.childCount - 1 : _scene.rootCount - 1;
+    }
+
+    private void SearchBehaviours(HashSet<MonoBehaviour> hashSet, Transform target) {
+      for (var i = 0; i < target.childCount; i++) {
+        Transform child = target.GetChild(i);
+        if (child == null)
+          continue;
+
+        MonoBehaviour[] behaviours = child.GetComponents<MonoBehaviour>();
+        foreach (MonoBehaviour behaviour in behaviours)
+          hashSet.Add(behaviour);
+
+        if (behaviours.All(behaviour => behaviour is not IStreamHolder))
+          SearchBehaviours(hashSet, child);
+      }
+    }
+
+    private void AddPersistentActions(ExecutionStream stream, MonoBehaviour behaviour, MethodInfo[] methods) {
+      if (behaviour is IUpdatable updatable)
+        stream.Add(updatable.UpdateFunction, behaviour.destroyCancellationToken, updatable.Priority);
+
+      IEnumerable<MethodInfo> persistentMethods = methods.Where(method => method.IsDefined(typeof(PersistentUpdateAttribute)));
+      foreach (MethodInfo method in persistentMethods) {
+        try {
+          var action = (Action<float>)Delegate.CreateDelegate(typeof(Action<float>), behaviour, method);
+          var attribute = method.GetCustomAttribute<PersistentUpdateAttribute>();
+          stream.Add(action, behaviour.destroyCancellationToken, attribute.Priority);
+        }
+        catch (TargetParameterCountException) {
+          Debug.LogError($"Method {method} has an invalid parameters count", behaviour);
+        }
+        catch (ArgumentException) {
+          Debug.LogError($"Method {method} has an invalid signature", behaviour);
+        }
+      }
+    }
+
+    private void AddParallelActions(ExecutionStream stream, MonoBehaviour behaviour, MethodInfo[] methods) {
+      if (behaviour is IParallelUpdatable parallelUpdatable)
+        stream.AddParallel(parallelUpdatable.ParallelUpdate, behaviour.destroyCancellationToken);
+
+      IEnumerable<MethodInfo> parallelMethods = methods.Where(method => method.IsDefined(typeof(ParallelUpdateAttribute)));
+      foreach (MethodInfo method in parallelMethods) {
+        try {
+          var action = (Action<float>)Delegate.CreateDelegate(typeof(Action<float>), behaviour, method);
+          stream.AddParallel(action, behaviour.destroyCancellationToken);
+        }
+        catch (TargetParameterCountException) {
+          Debug.LogError($"Method {method} has an invalid parameters count", behaviour);
+        }
+        catch (ArgumentException) {
+          Debug.LogError($"Method {method} has an invalid signature", behaviour);
+        }
+      }
     }
 
   }
