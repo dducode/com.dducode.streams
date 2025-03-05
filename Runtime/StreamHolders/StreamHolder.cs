@@ -4,24 +4,17 @@ using System.Linq;
 using System.Reflection;
 using StreamsForUnity.Attributes;
 using StreamsForUnity.Internal.Extensions;
-using StreamsForUnity.StreamActions;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace StreamsForUnity.StreamHolders {
 
-  /// <summary>
-  /// MonoBehaviour component that contains and controls the associated <see cref="Stream"/>.
-  /// It exists as a game object and controls the stream's <see cref="ManagedExecutionStream.Priority"/> using the transform sibling index.
-  /// These values are closely related - when the sibling index changes, the priority changes, and vice versa
-  /// </summary>
-  public abstract class StreamHolder<TSystem> : MonoBehaviour, IStreamHolder, IConfigurable<StreamHolder<TSystem>>, IJoinable<StreamHolder<TSystem>> {
+  /// <inheritdoc cref="StreamHolderBase"/>
+  public abstract class StreamHolder<TSystem> : StreamHolderBase, IJoinable<StreamHolder<TSystem>> {
 
-    [SerializeField] private bool searchInHierarchy;
-    [SerializeField] private MonoBehaviour[] connectedBehaviours;
-    public ExecutionStream Stream => _stream ??= CreateStream();
+    public override ExecutionStream Stream => _stream ??= CreateStream();
 
-    public uint Priority {
+    public override uint Priority {
       get => _stream.Priority;
       set => _stream.Priority = value;
     }
@@ -42,17 +35,17 @@ namespace StreamsForUnity.StreamHolders {
       return _streamHolderFactory.Create<THolder>(_transform, holderName).Stream;
     }
 
-    public StreamHolder<TSystem> SetDelta(float value) {
+    public override StreamHolderBase SetDelta(float value) {
       _stream.Delta = value;
       return this;
     }
 
-    public StreamHolder<TSystem> ResetDelta() {
+    public override StreamHolderBase ResetDelta() {
       _stream.ResetDelta();
       return this;
     }
 
-    public StreamHolder<TSystem> SetTickRate(uint value) {
+    public override StreamHolderBase SetTickRate(uint value) {
       _stream.TickRate = value;
       return this;
     }
@@ -63,10 +56,6 @@ namespace StreamsForUnity.StreamHolders {
 
       _stream.Join(other._stream);
       return this;
-    }
-
-    public override string ToString() {
-      return gameObject.name;
     }
 
     private void Start() {
