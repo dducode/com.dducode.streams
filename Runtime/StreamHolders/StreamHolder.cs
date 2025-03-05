@@ -21,6 +21,11 @@ namespace StreamsForUnity.StreamHolders {
     [SerializeField] private MonoBehaviour[] connectedBehaviours;
     public ExecutionStream Stream => _stream ??= CreateStream();
 
+    public uint Priority {
+      get => _stream.Priority;
+      set => _stream.Priority = value;
+    }
+
     private readonly MonoStreamHolderFactory _streamHolderFactory = new();
     private ManagedExecutionStream _stream;
 
@@ -132,8 +137,8 @@ namespace StreamsForUnity.StreamHolders {
       if (_transform.parent != _parent || _gameObject.scene != _scene)
         ReconnectStream();
 
-      if (_siblingIndex != _stream.Priority)
-        ChangePriority((int)_stream.Priority);
+      if (_siblingIndex != Priority)
+        ChangePriority((int)Priority);
       else if (_siblingIndex != _transform.GetSiblingIndex())
         ChangePriority(_transform.GetSiblingIndex());
     }
@@ -141,15 +146,13 @@ namespace StreamsForUnity.StreamHolders {
     private void ReconnectStream() {
       _parent = _transform.parent;
       _scene = _gameObject.scene;
-      var priority = (int)_stream.Priority;
-      _stream.Reconnect(GetBaseStream(_parent));
-      ChangePriority(priority);
+      _stream.Reconnect(GetBaseStream(_parent), (uint)(_siblingIndex = transform.GetSiblingIndex()));
     }
 
     private void ChangePriority(int priority) {
       priority = Mathf.Clamp(priority, 0, GetMaxObjectsInHierarchy());
       _transform.SetSiblingIndex(priority);
-      _stream.Priority = (uint)priority;
+      Priority = (uint)priority;
       _siblingIndex = priority;
     }
 
