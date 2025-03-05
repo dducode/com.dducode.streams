@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using StreamsForUnity.Attributes;
-using StreamsForUnity.Internal.Extensions;
+using StreamsForUnity.Extensions;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 

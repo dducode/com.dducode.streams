@@ -8,8 +8,6 @@ namespace StreamsForUnity.StreamActions {
     private static int NextId => ++_nextId;
     private static int _nextId = -1;
 
-    public int Id { get; } = NextId;
-
     public string Name {
       get => _name;
       set {
@@ -19,9 +17,11 @@ namespace StreamsForUnity.StreamActions {
       }
     }
 
-    public uint Priority {
+    internal int Id { get; } = NextId;
+
+    internal uint Priority {
       get => _priority;
-      internal set {
+      set {
         _priority = value;
         OnPriorityChanged?.Invoke();
       }
