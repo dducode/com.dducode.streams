@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using StreamsForUnity.Exceptions;
 using StreamsForUnity.Internal;
 using StreamsForUnity.StreamHolders;
-using StreamsForUnity.StreamHolders.MonoStreamHolders;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 

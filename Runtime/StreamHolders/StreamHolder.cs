@@ -8,7 +8,7 @@ using StreamsForUnity.StreamActions;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace StreamsForUnity.StreamHolders.MonoStreamHolders {
+namespace StreamsForUnity.StreamHolders {
 
   /// <summary>
   /// MonoBehaviour component that contains and controls the associated <see cref="Stream"/>.

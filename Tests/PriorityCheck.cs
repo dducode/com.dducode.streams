@@ -1,4 +1,4 @@
-using StreamsForUnity.StreamHolders.MonoStreamHolders;
+using StreamsForUnity.StreamHolders;
 using UnityEngine;
 
 namespace StreamsForUnity.Tests {
