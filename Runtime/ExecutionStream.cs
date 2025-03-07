@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using StreamsForUnity.Exceptions;
 using StreamsForUnity.Internal;
@@ -67,6 +68,14 @@ namespace StreamsForUnity {
       ValidateAddAction(action);
 
       var streamAction = new PersistentStreamAction(action, token, priority);
+      _actionsStorage.Add(streamAction);
+      return streamAction;
+    }
+
+    public CoroutineStreamAction Add([NotNull] Func<IEnumerator> action, StreamToken token = default, uint priority = uint.MaxValue) {
+      ValidateAddAction(action);
+
+      var streamAction = new CoroutineStreamAction(action, token, priority);
       _actionsStorage.Add(streamAction);
       return streamAction;
     }

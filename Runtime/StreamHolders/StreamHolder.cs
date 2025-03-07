@@ -1,9 +1,7 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using StreamsForUnity.Attributes;
 using StreamsForUnity.Extensions;
+using StreamsForUnity.Internal;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -102,18 +100,8 @@ namespace StreamsForUnity.StreamHolders {
         return;
 
       HashSet<MonoBehaviour> behaviours = connectedBehaviours.Where(behaviour => behaviour != null).ToHashSet();
-
-      if (searchInHierarchy)
-        SearchBehaviours(behaviours, _transform);
-
-      foreach (MonoBehaviour behaviour in behaviours) {
-        MethodInfo[] methods = behaviour
-          .GetType()
-          .GetMethods(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-
-        AddPersistentActions(stream, behaviour, methods);
-        AddParallelActions(stream, behaviour, methods);
-      }
+      // BehavioursHelper.SearchBehaviours(behaviours, _transform);
+      BehavioursHelper.ConnectBehavioursToStream(stream, behaviours);
     }
 
     private ExecutionStream GetBaseStream(Transform parent) {
@@ -147,60 +135,6 @@ namespace StreamsForUnity.StreamHolders {
 
     private int GetMaxObjectsInHierarchy() {
       return _parent != null ? _parent.childCount - 1 : _scene.rootCount - 1;
-    }
-
-    private void SearchBehaviours(HashSet<MonoBehaviour> hashSet, Transform target) {
-      for (var i = 0; i < target.childCount; i++) {
-        Transform child = target.GetChild(i);
-        if (child == null)
-          continue;
-
-        MonoBehaviour[] behaviours = child.GetComponents<MonoBehaviour>();
-        foreach (MonoBehaviour behaviour in behaviours)
-          hashSet.Add(behaviour);
-
-        if (behaviours.All(behaviour => behaviour is not IStreamHolder))
-          SearchBehaviours(hashSet, child);
-      }
-    }
-
-    private void AddPersistentActions(ExecutionStream stream, MonoBehaviour behaviour, MethodInfo[] methods) {
-      if (behaviour is IUpdatable updatable)
-        stream.Add(updatable.UpdateFunction, behaviour.destroyCancellationToken, updatable.Priority);
-
-      IEnumerable<MethodInfo> persistentMethods = methods.Where(method => method.IsDefined(typeof(PersistentUpdateAttribute)));
-      foreach (MethodInfo method in persistentMethods) {
-        try {
-          var action = (Action<float>)Delegate.CreateDelegate(typeof(Action<float>), behaviour, method);
-          var attribute = method.GetCustomAttribute<PersistentUpdateAttribute>();
-          stream.Add(action, behaviour.destroyCancellationToken, attribute.Priority);
-        }
-        catch (TargetParameterCountException) {
-          Debug.LogError($"Method {method} has an invalid parameters count", behaviour);
-        }
-        catch (ArgumentException) {
-          Debug.LogError($"Method {method} has an invalid signature", behaviour);
-        }
-      }
-    }
-
-    private void AddParallelActions(ExecutionStream stream, MonoBehaviour behaviour, MethodInfo[] methods) {
-      if (behaviour is IParallelUpdatable parallelUpdatable)
-        stream.AddParallel(parallelUpdatable.ParallelUpdate, behaviour.destroyCancellationToken);
-
-      IEnumerable<MethodInfo> parallelMethods = methods.Where(method => method.IsDefined(typeof(ParallelUpdateAttribute)));
-      foreach (MethodInfo method in parallelMethods) {
-        try {
-          var action = (Action<float>)Delegate.CreateDelegate(typeof(Action<float>), behaviour, method);
-          stream.AddParallel(action, behaviour.destroyCancellationToken);
-        }
-        catch (TargetParameterCountException) {
-          Debug.LogError($"Method {method} has an invalid parameters count", behaviour);
-        }
-        catch (ArgumentException) {
-          Debug.LogError($"Method {method} has an invalid signature", behaviour);
-        }
-      }
     }
 
   }

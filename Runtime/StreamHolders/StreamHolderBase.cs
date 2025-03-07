@@ -10,7 +10,6 @@ namespace StreamsForUnity.StreamHolders {
   /// </summary>
   public abstract class StreamHolderBase : MonoBehaviour, IStreamHolder, IConfigurable<StreamHolderBase> {
 
-    [SerializeField] protected bool searchInHierarchy;
     [SerializeField] protected MonoBehaviour[] connectedBehaviours;
 
     public abstract ExecutionStream Stream { get; }

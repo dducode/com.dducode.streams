@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using StreamsForUnity.Tests.Attributes;
@@ -161,6 +162,22 @@ namespace StreamsForUnity.Tests {
       stream.AddOnce(() => Debug.Log(2), priority: 2);
       stream.AddOnce(() => Debug.Log(3), priority: 3);
       Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test, Common]
+    public async Task Test() {
+      var tcs = new TaskCompletionSource<bool>();
+      Streams.Get<Update>().Add(Coroutine);
+      Streams.Get<Update>().AddTimer(0.1f, () => tcs.SetResult(true));
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    private IEnumerator Coroutine() {
+      Debug.Log(1);
+      yield return null;
+      Debug.Log(2);
+      yield return null;
+      Debug.Log(3);
     }
 
   }
