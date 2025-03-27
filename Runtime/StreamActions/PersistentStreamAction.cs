@@ -38,16 +38,18 @@ namespace Streams.StreamActions {
     internal override void Invoke(float deltaTime) {
       if (Canceled())
         return;
-      
+
       _ticks++;
+      _accumulatedDeltaTime += deltaTime;
 
       if (!_configuration.HasDelta) {
-        if (_ticks % _configuration.TickRate == 0)
-          _action(deltaTime);
+        if (_ticks % _configuration.TickRate == 0) {
+          _action(_accumulatedDeltaTime);
+          _accumulatedDeltaTime = 0;
+        }
+
         return;
       }
-
-      _accumulatedDeltaTime += deltaTime;
 
       while (_accumulatedDeltaTime > _configuration.Delta || Mathf.Approximately(_accumulatedDeltaTime, _configuration.Delta)) {
         _action(_configuration.Delta);

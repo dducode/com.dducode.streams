@@ -53,15 +53,17 @@ namespace Streams.StreamActions {
       }
 
       _ticks++;
+      _accumulatedDeltaTime += Math.Min(deltaTime, _remainingTime);
 
       if (!_configuration.HasDelta) {
-        if (_ticks % _configuration.TickRate == 0)
-          _action(deltaTime);
+        if (_ticks % _configuration.TickRate == 0) {
+          _action(_accumulatedDeltaTime);
+          _accumulatedDeltaTime = 0;
+        }
+
         _remainingTime = Math.Max(0, _remainingTime - deltaTime);
         return;
       }
-
-      _accumulatedDeltaTime += Math.Min(deltaTime, _remainingTime);
 
       while (_accumulatedDeltaTime > _configuration.Delta || Mathf.Approximately(_accumulatedDeltaTime, _configuration.Delta)) {
         _action(_configuration.Delta);
