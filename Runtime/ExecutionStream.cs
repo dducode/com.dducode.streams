@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
-using System.Diagnostics.CodeAnalysis;
+using System.Collections.Generic;
+using JetBrains.Annotations;
 using StreamsForUnity.Exceptions;
 using StreamsForUnity.Internal;
 using StreamsForUnity.StreamActions;
@@ -12,7 +13,7 @@ namespace StreamsForUnity {
 
   /// <summary>
   /// <p> Base class for all streams in the system. Execution stream contains and executes any actions. </p>
-  /// <p> Base streams executed on the Player Loop Systems, and they can be obtained from <see cref="Streams.Get{TSystem}"/> method.
+  /// <p> Base streams executed on the Player Loop Systems, and they can be obtained from <see cref="UnityPlayerLoop.GetStream{TSystem}"/> method.
   /// If you want to get the stream from scene, you can call <see cref="SceneStreams.GetStream{TBaseSystem}"/> </p>
   /// <code>
   /// Streams.Get&lt;Update&gt;().Add(deltaTime => {
@@ -32,11 +33,19 @@ namespace StreamsForUnity {
   /// </summary>
   public class ExecutionStream {
 
+    /// <summary>
+    /// Gets the currently running stream. If you try to get this outside of any stream, you'll get null
+    /// </summary>
+    [CanBeNull]
+    public static ExecutionStream RunningStream => _streamsStack.Count == 0 ? null : _streamsStack.Peek();
+
     /// <inheritdoc cref="ParallelWorkStrategy"/>
     public ParallelWorkStrategy WorkStrategy { get; set; } = ParallelWorkStrategy.Optimal;
 
     /// <inheritdoc cref="StreamState"/>
     public StreamState State { get; private set; }
+
+    private static readonly Stack<ExecutionStream> _streamsStack = new();
 
     private Action _terminateCallbacks;
     private Action _delayedCallbacks;
@@ -64,12 +73,16 @@ namespace StreamsForUnity {
     /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
     /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
-    public PersistentStreamAction Add(Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
+    public PersistentStreamAction Add([NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
       var streamAction = new PersistentStreamAction(action, token, priority);
       _actionsStorage.Add(streamAction);
       return streamAction;
+    }
+
+    public void Add([NotNull] IUpdatable updatable, StreamToken token = default, uint priority = uint.MaxValue) {
+      AddUpdatable(updatable, _actionsStorage, token, priority);
     }
 
     public CoroutineStreamAction Add([NotNull] Func<IEnumerator> action, StreamToken token = default, uint priority = uint.MaxValue) {
@@ -93,6 +106,10 @@ namespace StreamsForUnity {
       var streamAction = new PersistentStreamAction(action, token, uint.MaxValue);
       _parallelActionsStorage.Add(streamAction);
       return streamAction;
+    }
+
+    public void AddParallel([NotNull] IUpdatable updatable, StreamToken token = default) {
+      AddUpdatable(updatable, _parallelActionsStorage, token, uint.MaxValue);
     }
 
     /// <summary>
@@ -219,6 +236,17 @@ namespace StreamsForUnity {
       return _name;
     }
 
+    protected virtual bool CanExecute() {
+      return _actionsStorage.Count != 0 || _parallelActionsStorage.Count != 0;
+    }
+
+    protected void CopyFrom(ExecutionStream other) {
+      _actionsStorage.CopyFrom(other._actionsStorage);
+      _parallelActionsStorage.CopyFrom(other._parallelActionsStorage);
+      _delayedCallbacks += other._delayedCallbacks;
+      _terminateCallbacks += other._terminateCallbacks;
+    }
+
     internal void Update(float deltaTime) {
       ValidateExecution();
       _actionsStorage.Refresh();
@@ -253,15 +281,17 @@ namespace StreamsForUnity {
       State = StreamState.Terminated;
     }
 
-    protected virtual bool CanExecute() {
-      return _actionsStorage.Count != 0 || _parallelActionsStorage.Count != 0;
-    }
+    private void AddUpdatable([NotNull] IUpdatable updatable, ActionsStorage storage, StreamToken token, uint priority) {
+      if (updatable == null)
+        throw new ArgumentNullException(nameof(updatable));
 
-    protected void CopyFrom(ExecutionStream other) {
-      _actionsStorage.CopyFrom(other._actionsStorage);
-      _parallelActionsStorage.CopyFrom(other._parallelActionsStorage);
-      _delayedCallbacks += other._delayedCallbacks;
-      _terminateCallbacks += other._terminateCallbacks;
+      var initAction = new OnceStreamAction(updatable.Initialize, token, priority);
+      var streamAction = new PersistentStreamAction(updatable.UpdateFunction, token, priority);
+      var shutdownAction = new OnceStreamAction(updatable.Shutdown, token, priority);
+
+      _actionsStorage.Add(initAction);
+      initAction.OnComplete(() => storage.Add(streamAction));
+      streamAction.OnCancel(() => _actionsStorage.Add(shutdownAction));
     }
 
     private void ValidateExecution() {
@@ -284,7 +314,7 @@ namespace StreamsForUnity {
 
     private void Execute(float deltaTime) {
       State = StreamState.Running;
-      Streams.PushStream(this);
+      _streamsStack.Push(this);
       Profiler.BeginSample(_profilerName);
 
       _worker.Start(deltaTime, _parallelActionsStorage.Count, WorkStrategy, _handleParallelAction);
@@ -295,7 +325,7 @@ namespace StreamsForUnity {
       _worker.Wait();
 
       Profiler.EndSample();
-      Streams.PopStream();
+      _streamsStack.Pop();
       State = StreamState.Idle;
     }
 

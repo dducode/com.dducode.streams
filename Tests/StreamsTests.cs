@@ -14,7 +14,7 @@ namespace StreamsForUnity.Tests {
     public async Task DeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
       var cts = new StreamTokenSource();
-      Streams.Get<Update>().Add(delta => {
+      UnityPlayerLoop.GetStream<Update>().Add(delta => {
         tcs.SetResult(Mathf.Approximately(delta, Time.deltaTime));
         cts.Release();
       }, cts.Token);
@@ -26,7 +26,7 @@ namespace StreamsForUnity.Tests {
     public async Task FixedDeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
       var cts = new StreamTokenSource();
-      Streams.Get<FixedUpdate>().Add(delta => {
+      UnityPlayerLoop.GetStream<FixedUpdate>().Add(delta => {
         tcs.SetResult(Mathf.Approximately(delta, Time.fixedDeltaTime));
         cts.Release();
       }, cts.Token);
@@ -38,7 +38,7 @@ namespace StreamsForUnity.Tests {
     public async Task TemporaryUpdateTest() {
       var tcs = new TaskCompletionSource<bool>();
 
-      Streams.Get<Update>().AddTemporal(2, delta => {
+      UnityPlayerLoop.GetStream<Update>().AddTemporal(2, delta => {
         Debug.Log(delta);
       }).SetDelta(0.5f).OnComplete(() => tcs.SetResult(true));
 
@@ -49,7 +49,7 @@ namespace StreamsForUnity.Tests {
     public async Task FixedUpdateTest() {
       var tcs = new TaskCompletionSource<bool>();
 
-      Streams.Get<FixedUpdate>().AddTemporal(0.2f, delta => {
+      UnityPlayerLoop.GetStream<FixedUpdate>().AddTemporal(0.2f, delta => {
         Debug.Log(delta);
       }).SetDelta(0.002f).OnComplete(() => tcs.SetResult(true));
 
@@ -61,11 +61,11 @@ namespace StreamsForUnity.Tests {
       var tcs = new TaskCompletionSource<bool>();
       var completionHandle = new StreamTokenSource();
 
-      Streams.Get<Update>()
+      UnityPlayerLoop.GetStream<Update>()
         .AddConditional(() => !completionHandle.Released, delta => Debug.Log(delta))
         .SetDelta(0.1f); // TODO: fix test
 
-      Streams.Get<Update>().AddTimer(2, () => completionHandle.Release());
+      UnityPlayerLoop.GetStream<Update>().AddTimer(2, () => completionHandle.Release());
       Assert.IsTrue(await tcs.Task);
     }
 
@@ -75,7 +75,7 @@ namespace StreamsForUnity.Tests {
       var lockHandle = new StreamTokenSource();
       var disposeHandle = new StreamTokenSource();
 
-      ExecutionStream baseStream = Streams.Get<FixedUpdate>();
+      ExecutionStream baseStream = UnityPlayerLoop.GetStream<FixedUpdate>();
       var stream = new ManagedExecutionStream(baseStream);
       disposeHandle.Register(stream.Dispose);
 
@@ -105,7 +105,7 @@ namespace StreamsForUnity.Tests {
 
       var disposeHandle = new StreamTokenSource();
 
-      ExecutionStream baseStream = Streams.Get<FixedUpdate>();
+      ExecutionStream baseStream = UnityPlayerLoop.GetStream<FixedUpdate>();
       var stream = new ManagedExecutionStream(baseStream);
       disposeHandle.Register(stream.Dispose);
 
@@ -135,7 +135,7 @@ namespace StreamsForUnity.Tests {
     [Test, Common]
     public async Task ActionsChainTest() {
       var tcs = new TaskCompletionSource<bool>();
-      ExecutionStream stream = Streams.Get<Update>();
+      ExecutionStream stream = UnityPlayerLoop.GetStream<Update>();
       stream.AddOnce(() => {
         Debug.Log(1);
         stream.AddOnce(() => {
@@ -152,7 +152,7 @@ namespace StreamsForUnity.Tests {
     [Test, Common]
     public async Task PriorityActionsTest() {
       var tcs = new TaskCompletionSource<bool>();
-      ExecutionStream stream = Streams.Get<Update>();
+      ExecutionStream stream = UnityPlayerLoop.GetStream<Update>();
       stream.AddOnce(() => {
         Debug.Log(5);
         tcs.SetResult(true);
@@ -167,8 +167,8 @@ namespace StreamsForUnity.Tests {
     [Test, Common]
     public async Task Test() {
       var tcs = new TaskCompletionSource<bool>();
-      Streams.Get<Update>().Add(Coroutine);
-      Streams.Get<Update>().AddTimer(0.1f, () => tcs.SetResult(true));
+      UnityPlayerLoop.GetStream<Update>().Add(Coroutine);
+      UnityPlayerLoop.GetStream<Update>().AddTimer(0.1f, () => tcs.SetResult(true));
       Assert.IsTrue(await tcs.Task);
     }
 

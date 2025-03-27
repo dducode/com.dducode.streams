@@ -1,19 +1,20 @@
+using System;
 using UnityEngine.LowLevel;
 
 namespace StreamsForUnity.Internal {
 
   internal static class SystemRegistrar {
 
-    internal static void RegisterStreamAsSystem<TBaseSystem>(PlayerLoopSystem.UpdateFunction updateFunction) {
+    internal static void RegisterStreamAsSystem(PlayerLoopSystem.UpdateFunction updateFunction, Type systemType) {
       var newSystem = new PlayerLoopSystem {
         type = typeof(ExecutionStream),
         updateDelegate = updateFunction
       };
-      SystemManager.SetupSystem<TBaseSystem>(newSystem);
+      SystemManager.SetupSystem(newSystem, systemType);
     }
 
-    internal static void UnregisterStream<TBaseSystem>() {
-      SystemManager.RemoveSystem<TBaseSystem, ExecutionStream>();
+    internal static void UnregisterStream(Type systemType) {
+      SystemManager.RemoveSystem(systemType, typeof(ExecutionStream));
     }
 
   }

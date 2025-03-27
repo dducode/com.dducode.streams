@@ -1,12 +1,13 @@
+using System;
 using System.Collections.Generic;
 using StreamsForUnity.Exceptions;
-using StreamsForUnity.Internal;
 using StreamsForUnity.StreamHolders;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 #if UNITY_EDITOR
 using UnityEditor;
+using UnityEngine.Assertions;
 #endif
 
 namespace StreamsForUnity {
@@ -14,7 +15,7 @@ namespace StreamsForUnity {
   public static class SceneStreams {
 
     private static readonly Dictionary<Scene, SceneStreamsHolder> _streamsHolders = new();
-    private static readonly MonoStreamHolderFactory _streamHolderFactory = new();
+    private static StreamTokenSource _disposeHandle;
 
 #if UNITY_EDITOR
     static SceneStreams() {
@@ -28,43 +29,32 @@ namespace StreamsForUnity {
     /// <returns> Existing stream or new </returns>
     /// <exception cref="StreamsException"> Threw if the scene is invalid </exception>
     public static ExecutionStream GetStream<TSystem>(this Scene scene) {
-      if (!scene.IsValid())
-        throw new StreamsException($"Cannot get stream from invalid scene ({scene})");
-      return TryGetStream<TSystem>(scene, out ExecutionStream stream)
-        ? stream
-        : CreateNewStream<TSystem>(scene);
+      return GetStream(scene, typeof(TSystem));
     }
 
-    /// <summary>
-    /// Creates the new <see cref="StreamHolder{TSystem}">stream holder</see> and return its stream
-    /// </summary>
-    public static ExecutionStream CreateNestedStream<THolder>(this Scene scene, string holderName = "StreamHolder")
-      where THolder : MonoBehaviour, IStreamHolder {
-      return _streamHolderFactory.Create<THolder>(scene, holderName).Stream;
+    internal static ExecutionStream GetStream(this Scene scene, Type systemType) {
+      return GetStreamsHolder(scene).GetStream(systemType);
+    }
+
+    internal static IStreamsHolder GetStreamsHolder(this Scene scene) {
+      if (!scene.IsValid())
+        throw new StreamsException("Cannot get streams holder from invalid scene");
+
+      if (!_streamsHolders.ContainsKey(scene))
+        CreateStreamsHolderForScene(scene);
+
+      return _streamsHolders[scene];
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Initialize() {
-      SceneManager.sceneUnloaded += DisposeAttachedStreamsOnSceneUnloaded;
-      SceneManager.activeSceneChanged += ReorderStreams;
+      _disposeHandle = new StreamTokenSource();
     }
 
-    private static void DisposeAttachedStreamsOnSceneUnloaded(Scene scene) {
-      if (!_streamsHolders.TryGetValue(scene, out SceneStreamsHolder holder))
-        return;
-
-      holder.DisposeAttachedStreams();
-      _streamsHolders.Remove(scene);
-    }
-
-    private static void ReorderStreams(Scene current, Scene next) {
-      if (current.buildIndex == -1) // on startup the current scene index is -1
-        return;
-
-      if (_streamsHolders.TryGetValue(current, out SceneStreamsHolder firstHolder))
-        firstHolder.ReorderStreams(uint.MaxValue);
-      if (_streamsHolders.TryGetValue(next, out SceneStreamsHolder secondHolder))
-        secondHolder.ReorderStreams(0);
+    private static void CreateStreamsHolderForScene(Scene scene) {
+      var holder = new SceneStreamsHolder(scene, _disposeHandle.Token);
+      _streamsHolders.Add(scene, holder);
+      holder.OnDispose(() => _streamsHolders.Remove(scene));
     }
 
 #if UNITY_EDITOR
@@ -72,32 +62,10 @@ namespace StreamsForUnity {
       if (state != PlayModeStateChange.ExitingPlayMode)
         return;
 
-      foreach (SceneStreamsHolder holder in _streamsHolders.Values)
-        holder.DisposeAttachedStreams();
-      _streamsHolders.Clear();
-
-      SceneManager.sceneUnloaded -= DisposeAttachedStreamsOnSceneUnloaded;
-      SceneManager.activeSceneChanged -= ReorderStreams;
+      _disposeHandle.Release();
+      Assert.IsTrue(_streamsHolders.Count == 0, "Internal error - not all holders were released");
     }
 #endif
-
-    private static bool TryGetStream<TSystem>(Scene scene, out ExecutionStream executionStream) {
-      if (_streamsHolders.TryGetValue(scene, out SceneStreamsHolder holder)) {
-        if (holder.TryGetStream<TSystem>(out ExecutionStream stream)) {
-          executionStream = stream;
-          return true;
-        }
-      }
-
-      executionStream = null;
-      return false;
-    }
-
-    private static ExecutionStream CreateNewStream<TSystem>(Scene scene) {
-      if (!_streamsHolders.ContainsKey(scene))
-        _streamsHolders.Add(scene, new SceneStreamsHolder(scene));
-      return _streamsHolders[scene].CreateStream<TSystem>();
-    }
 
   }
 

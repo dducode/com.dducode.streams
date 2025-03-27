@@ -1,4 +1,4 @@
-namespace StreamsForUnity.StreamHolders {
+namespace Streams {
 
   public interface IJoinable<TConcrete> {
 

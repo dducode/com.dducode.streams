@@ -2,8 +2,13 @@ namespace StreamsForUnity {
 
   public interface IUpdatable {
 
-    public uint Priority => uint.MaxValue;
+    public void Initialize() {
+    }
+
     public void UpdateFunction(float deltaTime);
+
+    public void Shutdown() {
+    }
 
   }
 

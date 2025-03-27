@@ -6,8 +6,8 @@ namespace StreamsForUnity.Internal {
 
   internal static class SystemManager {
 
-    internal static void SetupSystem<TBaseSystem>(PlayerLoopSystem newSystem) {
-      SetupSystem(typeof(TBaseSystem), newSystem);
+    internal static void SetupSystem(PlayerLoopSystem newSystem, Type systemType) {
+      SetupSystem(systemType, newSystem);
     }
 
     internal static void SetupSystem(Type baseSystemType, PlayerLoopSystem newSystem) {
@@ -17,9 +17,9 @@ namespace StreamsForUnity.Internal {
       PlayerLoop.SetPlayerLoop(system);
     }
 
-    internal static void RemoveSystem<TBaseSystem, TSystem>() {
+    internal static void RemoveSystem(Type baseSystemType, Type systemType) {
       PlayerLoopSystem system = PlayerLoop.GetCurrentPlayerLoop();
-      if (!FindSystemAndRemove<TSystem>(typeof(TBaseSystem), ref system))
+      if (!FindSystemAndRemove(systemType, baseSystemType, ref system))
         throw new StreamsException("Cannot remove system because base system doesn't exist");
       PlayerLoop.SetPlayerLoop(system);
     }
@@ -40,9 +40,9 @@ namespace StreamsForUnity.Internal {
       return false;
     }
 
-    private static bool FindSystemAndRemove<TSystem>(Type baseSystemType, ref PlayerLoopSystem system) {
+    private static bool FindSystemAndRemove(Type systemType, Type baseSystemType, ref PlayerLoopSystem system) {
       if (system.type == baseSystemType) {
-        RemoveSystem<TSystem>(ref system);
+        RemoveSystem(ref system, systemType);
         return true;
       }
 
@@ -50,7 +50,7 @@ namespace StreamsForUnity.Internal {
         return false;
 
       for (var i = 0; i < system.subSystemList.Length; i++)
-        if (FindSystemAndRemove<TSystem>(baseSystemType, ref system.subSystemList[i]))
+        if (FindSystemAndRemove(systemType, baseSystemType, ref system.subSystemList[i]))
           return true;
 
       return false;
@@ -71,13 +71,13 @@ namespace StreamsForUnity.Internal {
       system.subSystemList = newSubSystems;
     }
 
-    private static void RemoveSystem<TSystem>(ref PlayerLoopSystem system) {
+    private static void RemoveSystem(ref PlayerLoopSystem system, Type systemType) {
       var newSubSystems = new PlayerLoopSystem[system.subSystemList.Length - 1];
 
       var i = 0;
 
       foreach (PlayerLoopSystem subSystem in system.subSystemList) {
-        if (subSystem.type == typeof(TSystem))
+        if (subSystem.type == systemType)
           continue;
         newSubSystems[i++] = subSystem;
       }

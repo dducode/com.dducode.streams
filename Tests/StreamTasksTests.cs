@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using StreamsForUnity.StreamTasks.Extensions;
 using StreamsForUnity.Exceptions;
 using StreamsForUnity.StreamTasks;
-using StreamsForUnity.StreamTasks.Extensions;
 using StreamsForUnity.Tests.Attributes;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
@@ -18,7 +18,7 @@ namespace StreamsForUnity.Tests {
     public async Task AsyncActionTest() {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(2, tcs);
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         Debug.Log(1);
         await StreamTask.Yield();
         Debug.Log(2);
@@ -34,7 +34,7 @@ namespace StreamsForUnity.Tests {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(2, tcs);
       var flag = false;
-      ExecutionStream stream = Streams.Get<Update>();
+      ExecutionStream stream = UnityPlayerLoop.GetStream<Update>();
       stream.AddTimer(1, () => flag = true);
       stream.AddOnce(async () => {
         await StreamTask.WaitWhile(() => !flag);
@@ -54,7 +54,7 @@ namespace StreamsForUnity.Tests {
       Debug.Log($"Third delay: {thirdDelay}");
 
       SetFailureAfterTime(2, tcs);
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.WhenAll(StreamTask.Delay(firstDelay), StreamTask.Delay(secondDelay), StreamTask.Delay(thirdDelay));
         tcs.SetResult(true);
       });
@@ -72,7 +72,7 @@ namespace StreamsForUnity.Tests {
       Debug.Log($"Third delay: {thirdDelay}");
 
       SetFailureAfterTime(2, tcs);
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.WhenAny(StreamTask.Delay(firstDelay), StreamTask.Delay(secondDelay), StreamTask.Delay(thirdDelay));
         tcs.SetResult(true);
       });
@@ -96,7 +96,7 @@ namespace StreamsForUnity.Tests {
     public async Task ContinuationTest() {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(2, tcs);
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.Delay(1000).ContinueWith(() => tcs.SetResult(true));
       });
       Assert.IsTrue(await tcs.Task);
@@ -106,7 +106,7 @@ namespace StreamsForUnity.Tests {
     public async Task AsyncContinuationTest() {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(3, tcs);
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.Delay(1000).ContinueWith(async () => {
           await StreamTask.Delay(1000).ContinueWith(() => tcs.SetResult(true));
         });
@@ -118,7 +118,7 @@ namespace StreamsForUnity.Tests {
     public async Task NestedContinuationsTest() {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(6, tcs);
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.Delay(1000).ContinueWith(async () => {
           await StreamTask.Delay(1000).ContinueWith(async () => {
             await StreamTask.Delay(1000);
@@ -134,7 +134,7 @@ namespace StreamsForUnity.Tests {
       var tasks = new List<StreamTask>(5);
       SetFailureAfterTime(3, tcs);
 
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         StreamTask task = StreamTask.Delay(1000);
 
         for (var i = 0; i < 5; i++) {
@@ -155,7 +155,7 @@ namespace StreamsForUnity.Tests {
       var tasks = new List<StreamTask>(5);
       SetFailureAfterTime(3, tcs);
 
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         StreamTask task = StreamTask.Delay(1000);
 
         for (var i = 0; i < 5; i++) {
@@ -181,7 +181,7 @@ namespace StreamsForUnity.Tests {
       var sts = new StreamTokenSource();
       SetFailureAfterTime(2, tcs);
 
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         try {
           sts.Release();
           await StreamTask.Delay(1000, sts.Token);
@@ -201,7 +201,7 @@ namespace StreamsForUnity.Tests {
       var sts = new StreamTokenSource();
       SetFailureAfterTime(2, tcs);
 
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         try {
           await StreamTask.Delay(1000, sts.Token);
           tcs.SetResult(false);
@@ -210,7 +210,7 @@ namespace StreamsForUnity.Tests {
           tcs.SetResult(true);
         }
       });
-      Streams.Get<Update>().AddTimer(0.5f, () => sts.Release());
+      UnityPlayerLoop.GetStream<Update>().AddTimer(0.5f, () => sts.Release());
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -220,7 +220,7 @@ namespace StreamsForUnity.Tests {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(2, tcs);
 
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         try {
           await Task.Delay(500);
           await StreamTask.Delay(500);
@@ -240,7 +240,7 @@ namespace StreamsForUnity.Tests {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(2, tcs);
 
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await Task.Delay(500).ToStreamTask();
         await StreamTask.Delay(500);
         tcs.SetResult(true);
@@ -254,7 +254,7 @@ namespace StreamsForUnity.Tests {
       var tcs = new TaskCompletionSource<bool>();
       SetFailureAfterTime(1, tcs);
 
-      Streams.Get<Update>().AddOnce(async () => {
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.Delay(500);
       }).OnComplete(() => tcs.SetResult(true));
 
@@ -262,7 +262,7 @@ namespace StreamsForUnity.Tests {
     }
 
     private void SetFailureAfterTime(float time, TaskCompletionSource<bool> tcs) {
-      Streams.Get<Update>().AddTimer(time, () => tcs.SetResult(false));
+      UnityPlayerLoop.GetStream<Update>().AddTimer(time, () => tcs.SetResult(false));
     }
 
   }

@@ -1,9 +1,8 @@
 using StreamsForUnity.Internal;
-using StreamsForUnity.StreamHolders;
 
 namespace StreamsForUnity.StreamStateMachine {
 
-  public abstract class State : IStreamHolder {
+  public abstract class State {
 
     public ExecutionStream Stream => _stream;
     protected IStateMachine StateMachine { get; private set; }
@@ -22,7 +21,7 @@ namespace StreamsForUnity.StreamStateMachine {
 
     internal void Initialize<TSystem>(IStateMachine stateMachine, StreamToken disposeToken) {
       StateMachine = stateMachine;
-      _stream = new ManagedExecutionStream(Streams.Get<TSystem>(), NamesUtility.CreateProfilerSampleName(GetType()));
+      _stream = new ManagedExecutionStream(UnityPlayerLoop.GetStream<TSystem>(), NamesUtility.CreateProfilerSampleName(GetType()));
       disposeToken.Register(_stream.Dispose);
       _stream.Lock(_lockHandle.Token);
       OnInitialize();

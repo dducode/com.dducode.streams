@@ -1,4 +1,5 @@
 using System;
+using Streams;
 using StreamsForUnity.Exceptions;
 using StreamsForUnity.StreamActions;
 using UnityEngine;
@@ -10,7 +11,7 @@ namespace StreamsForUnity {
   /// stream with it, and <see cref="Reconnect">reconnect</see> to another stream. </p>
   /// <p> You can also configure the <see cref="Priority"/> of the stream, <see cref="Delta"/> and <see cref="TickRate"/> of the stream execution </p>
   /// </summary>
-  public sealed class ManagedExecutionStream : ExecutionStream, IDisposable {
+  public sealed class ManagedExecutionStream : ExecutionStream, IDisposable, IJoinable<ManagedExecutionStream> {
 
     public bool Locked => _lockers > 0;
 
@@ -143,7 +144,7 @@ namespace StreamsForUnity {
       if (other.Priority < Priority)
         return other.Join(this);
 
-      ExecutionStream runningStream = Streams.RunningStream;
+      ExecutionStream runningStream = RunningStream;
       if (runningStream == this || runningStream == other)
         throw new StreamsException($"Cannot join a running stream ({runningStream})");
 
