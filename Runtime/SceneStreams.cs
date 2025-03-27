@@ -1,16 +1,13 @@
 using System;
 using System.Collections.Generic;
-using StreamsForUnity.Exceptions;
-using StreamsForUnity.StreamHolders;
+using Streams.Exceptions;
+using Streams.StreamHolders;
+using UnityEditor;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.SceneManagement;
 
-#if UNITY_EDITOR
-using UnityEditor;
-using UnityEngine.Assertions;
-#endif
-
-namespace StreamsForUnity {
+namespace Streams {
 
   public static class SceneStreams {
 

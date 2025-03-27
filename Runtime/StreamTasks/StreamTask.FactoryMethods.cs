@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
-using StreamsForUnity.StreamTasks.Internal;
+using Streams.StreamTasks.Internal;
 
-namespace StreamsForUnity.StreamTasks {
+namespace Streams.StreamTasks {
 
   public partial class StreamTask {
 

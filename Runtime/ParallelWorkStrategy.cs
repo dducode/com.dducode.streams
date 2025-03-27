@@ -1,4 +1,4 @@
-namespace StreamsForUnity {
+namespace Streams {
 
   /// <summary>
   /// Defines the parallel work strategy that determines the intensity of parallel execution.

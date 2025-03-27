@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 
-namespace StreamsForUnity.Internal {
+namespace Streams.Internal {
 
   internal class WorkerState {
 

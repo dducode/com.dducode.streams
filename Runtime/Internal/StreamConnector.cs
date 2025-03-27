@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace StreamsForUnity.Internal {
+namespace Streams.Internal {
 
   internal static class StreamConnector {
 

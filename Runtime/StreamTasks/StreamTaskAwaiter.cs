@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
-namespace StreamsForUnity.StreamTasks {
+namespace Streams.StreamTasks {
 
   public readonly struct StreamTaskAwaiter : ICriticalNotifyCompletion {
 

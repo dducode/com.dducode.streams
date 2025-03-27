@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using JetBrains.Annotations;
 
-namespace StreamsForUnity {
+namespace Streams {
 
   public readonly struct StreamToken {
 

@@ -1,4 +1,4 @@
-namespace StreamsForUnity {
+namespace Streams {
 
   public interface IUpdatable {
 

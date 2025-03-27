@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace StreamsForUnity.Tests {
+namespace Streams.Tests {
 
   public class EmptyAction : MonoBehaviour {
 

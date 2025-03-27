@@ -1,7 +1,7 @@
 using System;
-using StreamsForUnity.StreamActions.Components;
+using Streams.StreamActions.Components;
 
-namespace StreamsForUnity.StreamActions {
+namespace Streams.StreamActions {
 
   public sealed class OnceStreamAction : StreamAction, ICompletable {
 

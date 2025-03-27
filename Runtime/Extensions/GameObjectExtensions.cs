@@ -1,7 +1,7 @@
-using StreamsForUnity.StreamHolders;
+using Streams.StreamHolders;
 using UnityEngine;
 
-namespace StreamsForUnity.Extensions {
+namespace Streams.Extensions {
 
   public static class GameObjectExtensions {
 

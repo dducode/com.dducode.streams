@@ -1,9 +1,9 @@
 using System;
 using System.Threading;
 using JetBrains.Annotations;
-using StreamsForUnity.Exceptions;
+using Streams.Exceptions;
 
-namespace StreamsForUnity.Internal {
+namespace Streams.Internal {
 
   internal class ParallelActionsWorker {
 

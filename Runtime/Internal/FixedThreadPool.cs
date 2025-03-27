@@ -4,7 +4,7 @@ using System.Threading;
 using JetBrains.Annotations;
 using UnityEngine;
 
-namespace StreamsForUnity.Internal {
+namespace Streams.Internal {
 
   internal static class FixedThreadPool {
 

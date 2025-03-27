@@ -2,15 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using StreamsForUnity.StreamTasks.Extensions;
-using StreamsForUnity.Exceptions;
-using StreamsForUnity.StreamTasks;
-using StreamsForUnity.Tests.Attributes;
+using Streams.Exceptions;
+using Streams.StreamTasks;
+using Streams.StreamTasks.Extensions;
+using Streams.Tests.Attributes;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 using Random = UnityEngine.Random;
 
-namespace StreamsForUnity.Tests {
+namespace Streams.Tests {
 
   public class StreamTasksTests {
 

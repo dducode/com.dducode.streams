@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace StreamsForUnity.StreamTasks.Internal {
+namespace Streams.StreamTasks.Internal {
 
   internal class AsyncStateMachineRunner<TStateMachine> : IAsyncStateMachineRunner where TStateMachine : IAsyncStateMachine {
 

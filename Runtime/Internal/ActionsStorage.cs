@@ -1,9 +1,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using StreamsForUnity.StreamActions;
+using Streams.StreamActions;
 
-namespace StreamsForUnity.Internal {
+namespace Streams.Internal {
 
   internal sealed class ActionsStorage : IEnumerable<StreamAction> {
 

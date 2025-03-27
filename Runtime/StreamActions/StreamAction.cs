@@ -1,7 +1,7 @@
 using System;
 using JetBrains.Annotations;
 
-namespace StreamsForUnity.StreamActions {
+namespace Streams.StreamActions {
 
   public abstract class StreamAction {
 

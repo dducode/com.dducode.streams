@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using StreamsForUnity.Exceptions;
-using StreamsForUnity.StreamActions;
+using Streams.Exceptions;
+using Streams.StreamActions;
 
-namespace StreamsForUnity.Internal {
+namespace Streams.Internal {
 
   internal class StreamActionComparer : IComparer<StreamAction> {
 

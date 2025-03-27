@@ -1,6 +1,6 @@
-using StreamsForUnity.Exceptions;
+using Streams.Exceptions;
 
-namespace StreamsForUnity.StreamTasks.Internal {
+namespace Streams.StreamTasks.Internal {
 
   internal static class StreamTaskHelper {
 

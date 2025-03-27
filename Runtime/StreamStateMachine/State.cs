@@ -1,6 +1,6 @@
-using StreamsForUnity.Internal;
+using Streams.Internal;
 
-namespace StreamsForUnity.StreamStateMachine {
+namespace Streams.StreamStateMachine {
 
   public abstract class State {
 

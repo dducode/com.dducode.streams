@@ -1,7 +1,7 @@
 using System;
 using UnityEngine.LowLevel;
 
-namespace StreamsForUnity.Internal {
+namespace Streams.Internal {
 
   internal static class SystemRegistrar {
 

@@ -1,10 +1,10 @@
 using System.Threading.Tasks;
 using NUnit.Framework;
-using StreamsForUnity.StreamStateMachine;
-using StreamsForUnity.Tests.Attributes;
+using Streams.StreamStateMachine;
+using Streams.Tests.Attributes;
 using UnityEngine.PlayerLoop;
 
-namespace StreamsForUnity.Tests.StateMachineTests {
+namespace Streams.Tests.StateMachineTests {
 
   public class StateMachineTests {
 

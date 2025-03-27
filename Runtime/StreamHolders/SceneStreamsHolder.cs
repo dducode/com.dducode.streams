@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine.SceneManagement;
 
-namespace StreamsForUnity.StreamHolders {
+namespace Streams.StreamHolders {
 
   internal sealed class SceneStreamsHolder : IStreamsHolder {
 

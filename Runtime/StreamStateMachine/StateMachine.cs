@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
 
-namespace StreamsForUnity.StreamStateMachine {
+namespace Streams.StreamStateMachine {
 
   /// <summary>
   /// The finite state machine that allows you to control multiple streams as states

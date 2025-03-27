@@ -2,7 +2,7 @@ using System;
 using UnityEngine.LowLevel;
 using UnityEngine.PlayerLoop;
 
-namespace StreamsForUnity.Internal {
+namespace Streams.Internal {
 
   internal static class SystemIdentifier {
 

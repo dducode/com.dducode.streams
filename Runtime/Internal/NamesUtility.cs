@@ -2,7 +2,7 @@ using System;
 using System.Text;
 using JetBrains.Annotations;
 
-namespace StreamsForUnity.Internal {
+namespace Streams.Internal {
 
   internal static class NamesUtility {
 

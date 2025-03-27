@@ -1,4 +1,4 @@
-namespace StreamsForUnity.StreamActions {
+namespace Streams.StreamActions {
 
   public interface IConfigurable<out TConcrete> {
 

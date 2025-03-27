@@ -1,9 +1,9 @@
 using System;
 using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
-using StreamsForUnity.StreamTasks.Internal;
+using Streams.StreamTasks.Internal;
 
-namespace StreamsForUnity.StreamTasks {
+namespace Streams.StreamTasks {
 
   [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
   public struct StreamTaskMethodBuilder {

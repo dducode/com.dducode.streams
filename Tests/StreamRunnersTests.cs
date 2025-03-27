@@ -1,9 +1,9 @@
 using System.Threading.Tasks;
 using NUnit.Framework;
-using StreamsForUnity.StreamHolders;
+using Streams.StreamHolders;
 using UnityEngine.PlayerLoop;
 
-namespace StreamsForUnity.Tests {
+namespace Streams.Tests {
 
   public class StreamRunnersTests {
 

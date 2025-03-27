@@ -1,12 +1,12 @@
 using System.Collections;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using StreamsForUnity.Tests.Attributes;
+using Streams.Tests.Attributes;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 using UnityEngine.SceneManagement;
 
-namespace StreamsForUnity.Tests {
+namespace Streams.Tests {
 
   public class StreamsTests {
 

@@ -1,8 +1,8 @@
 using System;
-using StreamsForUnity.StreamActions.Components;
-using StreamsForUnity.StreamTasks;
+using Streams.StreamActions.Components;
+using Streams.StreamTasks;
 
-namespace StreamsForUnity.StreamActions {
+namespace Streams.StreamActions {
 
   public class AsyncStreamAction : StreamAction, ICompletable {
 

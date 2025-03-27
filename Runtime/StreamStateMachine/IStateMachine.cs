@@ -1,6 +1,6 @@
 using System;
 
-namespace StreamsForUnity.StreamStateMachine {
+namespace Streams.StreamStateMachine {
 
   public interface IStateMachine : IDisposable {
 

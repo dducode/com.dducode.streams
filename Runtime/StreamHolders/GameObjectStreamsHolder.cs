@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using StreamsForUnity.Extensions;
+using Streams.Extensions;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 using UnityEngine.SceneManagement;
 
-namespace StreamsForUnity.StreamHolders {
+namespace Streams.StreamHolders {
 
   [DisallowMultipleComponent]
   public class GameObjectStreamsHolder : MonoBehaviour, IStreamsHolder {

@@ -1,15 +1,12 @@
 using System;
 using System.Collections.Generic;
-using StreamsForUnity.Exceptions;
-using StreamsForUnity.Internal;
+using Streams.Exceptions;
+using Streams.Internal;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
-
-namespace StreamsForUnity {
+namespace Streams {
 
   public static class UnityPlayerLoop {
 

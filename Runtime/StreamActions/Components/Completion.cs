@@ -1,6 +1,6 @@
 using System;
 
-namespace StreamsForUnity.StreamActions.Components {
+namespace Streams.StreamActions.Components {
 
   internal class Completion : ICompletable {
 

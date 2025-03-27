@@ -1,8 +1,8 @@
-using StreamsForUnity.StreamHolders;
+using Streams.StreamHolders;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace StreamsForUnity {
+namespace Streams {
 
   public class GameObjectStreamsHolderFactory {
 

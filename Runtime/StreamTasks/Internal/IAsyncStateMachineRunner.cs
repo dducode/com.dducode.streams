@@ -1,4 +1,4 @@
-namespace StreamsForUnity.StreamTasks.Internal {
+namespace Streams.StreamTasks.Internal {
 
   internal interface IAsyncStateMachineRunner {
 

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace StreamsForUnity.StreamTasks.Internal {
+namespace Streams.StreamTasks.Internal {
 
   internal static class StreamTaskScheduler {
 

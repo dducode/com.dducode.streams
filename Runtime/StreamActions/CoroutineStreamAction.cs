@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 
-namespace StreamsForUnity.StreamActions {
+namespace Streams.StreamActions {
 
   public class CoroutineStreamAction : StreamAction {
 

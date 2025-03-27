@@ -4,7 +4,7 @@ using Unity.PerformanceTesting;
 using UnityEngine;
 using Random = System.Random;
 
-namespace StreamsForUnity.Tests {
+namespace Streams.Tests {
 
   public class PerformanceTests {
 

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace StreamsForUnity.Extensions {
+namespace Streams.Extensions {
 
   public static class ComponentExtensions {
 

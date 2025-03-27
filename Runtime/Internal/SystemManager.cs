@@ -1,8 +1,8 @@
 using System;
-using StreamsForUnity.Exceptions;
+using Streams.Exceptions;
 using UnityEngine.LowLevel;
 
-namespace StreamsForUnity.Internal {
+namespace Streams.Internal {
 
   internal static class SystemManager {
 

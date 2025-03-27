@@ -1,6 +1,6 @@
 using System;
 
-namespace StreamsForUnity.StreamHolders {
+namespace Streams.StreamHolders {
 
   /// <summary>
   /// Base contract fol all stream holders

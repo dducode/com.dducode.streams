@@ -2,14 +2,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using JetBrains.Annotations;
-using StreamsForUnity.Exceptions;
-using StreamsForUnity.Internal;
-using StreamsForUnity.StreamActions;
-using StreamsForUnity.StreamTasks;
+using Streams.Exceptions;
+using Streams.Internal;
+using Streams.StreamActions;
+using Streams.StreamTasks;
 using UnityEngine.Profiling;
 using Debug = UnityEngine.Debug;
 
-namespace StreamsForUnity {
+namespace Streams {
 
   /// <summary>
   /// <p> Base class for all streams in the system. Execution stream contains and executes any actions. </p>

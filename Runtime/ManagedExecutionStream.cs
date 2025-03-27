@@ -1,10 +1,9 @@
 using System;
-using Streams;
-using StreamsForUnity.Exceptions;
-using StreamsForUnity.StreamActions;
+using Streams.Exceptions;
+using Streams.StreamActions;
 using UnityEngine;
 
-namespace StreamsForUnity {
+namespace Streams {
 
   /// <summary>
   /// <p> The custom stream that you can control. You can <see cref="Lock">lock</see> this stream, <see cref="Join">join</see> another

@@ -1,4 +1,4 @@
-namespace StreamsForUnity {
+namespace Streams {
 
   /// <summary>
   /// Defines how the stream will be unlocked

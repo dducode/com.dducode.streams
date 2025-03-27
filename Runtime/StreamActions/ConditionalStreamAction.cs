@@ -1,8 +1,8 @@
 using System;
-using StreamsForUnity.StreamActions.Components;
+using Streams.StreamActions.Components;
 using UnityEngine;
 
-namespace StreamsForUnity.StreamActions {
+namespace Streams.StreamActions {
 
   public sealed class ConditionalStreamAction : StreamAction, IConfigurable<ConditionalStreamAction> {
 

@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
-using StreamsForUnity.Exceptions;
+using Streams.Exceptions;
 
-namespace StreamsForUnity {
+namespace Streams {
 
   public class StreamTokenSource : IDisposable {
 

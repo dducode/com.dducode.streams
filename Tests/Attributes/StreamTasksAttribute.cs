@@ -1,7 +1,7 @@
 using System;
 using NUnit.Framework;
 
-namespace StreamsForUnity.Tests.Attributes {
+namespace Streams.Tests.Attributes {
 
   [AttributeUsage(AttributeTargets.Method)]
   public class StreamTasksAttribute : CategoryAttribute {

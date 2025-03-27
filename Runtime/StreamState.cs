@@ -1,4 +1,4 @@
-namespace StreamsForUnity {
+namespace Streams {
 
   /// <summary>
   /// Defines the current state of the stream

@@ -1,7 +1,7 @@
-using StreamsForUnity.StreamStateMachine;
+using Streams.StreamStateMachine;
 using UnityEngine;
 
-namespace StreamsForUnity.Tests.StateMachineTests {
+namespace Streams.Tests.StateMachineTests {
 
   public class HelloState : State {
 
