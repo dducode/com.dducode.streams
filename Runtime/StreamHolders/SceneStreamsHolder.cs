@@ -32,7 +32,9 @@ namespace Streams.StreamHolders {
 
     private ExecutionStream CreateStream(Type systemType) {
       uint priority = SceneManager.GetActiveScene() == _scene ? 0 : uint.MaxValue;
-      var stream = new ManagedExecutionStream(UnityPlayerLoop.GetStream(systemType), _scene.name, priority);
+      var stream = new ManagedExecutionStream(UnityPlayerLoop.GetStream(systemType), _scene.name) {
+        Priority = priority
+      };
       _streams.Add(systemType, stream);
       _disposeHandle.Register(stream.Dispose);
       return stream;

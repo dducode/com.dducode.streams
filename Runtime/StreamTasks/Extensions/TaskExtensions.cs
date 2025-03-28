@@ -1,7 +1,10 @@
 using System.Threading.Tasks;
-using Cysharp.Threading.Tasks;
 using Streams.StreamTasks.Internal;
 using UnityEngine;
+
+#if STREAMS_UNITASK_INTEGRATION
+using Cysharp.Threading.Tasks;
+#endif
 
 namespace Streams.StreamTasks.Extensions {
 

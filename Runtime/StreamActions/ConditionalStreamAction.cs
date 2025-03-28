@@ -35,6 +35,7 @@ namespace Streams.StreamActions {
 
     public ConditionalStreamAction SetTickRate(uint value) {
       _configuration.TickRate = value;
+      _accumulatedDeltaTime = 0;
       return this;
     }
 

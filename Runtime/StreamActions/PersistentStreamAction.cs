@@ -32,6 +32,7 @@ namespace Streams.StreamActions {
 
     public PersistentStreamAction SetTickRate(uint value) {
       _configuration.TickRate = value;
+      _accumulatedDeltaTime = 0;
       return this;
     }
 

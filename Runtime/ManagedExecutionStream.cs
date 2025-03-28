@@ -16,7 +16,7 @@ namespace Streams {
 
     /// <inheritdoc cref="StreamUnlockMode"/>
     /// <remarks> The unlock behavior is set when the stream is created and doesn't change during the lifetime of the stream </remarks>
-    public StreamUnlockMode UnlockMode { get; }
+    public StreamUnlockMode UnlockMode { get; set; } = StreamUnlockMode.WhenAll;
 
     /// <summary>
     /// Gets and sets the priority of the stream relative to other streams of the parent stream
@@ -54,6 +54,7 @@ namespace Streams {
         if (_delta.HasValue && Mathf.Approximately(_delta.Value, value))
           return;
 
+        _execution.SetTickRate(_tickRate = 1);
         _execution.SetDelta((_delta = value).Value);
       }
     }
@@ -84,11 +85,13 @@ namespace Streams {
         if (_tickRate == value)
           return;
 
+        _delta = null;
+        _execution.ResetDelta();
         _execution.SetTickRate(_tickRate = value);
       }
     }
 
-    private uint _priority;
+    private uint _priority = uint.MaxValue;
     private float? _delta;
     private uint _tickRate = 1;
     private StreamTokenSource _subscriptionHandle;
@@ -98,15 +101,12 @@ namespace Streams {
 
     public ManagedExecutionStream(
       ExecutionStream baseStream,
-      string name = nameof(ManagedExecutionStream),
-      uint priority = uint.MaxValue,
-      StreamUnlockMode unlockMode = StreamUnlockMode.WhenAll
+      string name = nameof(ManagedExecutionStream)
     ) : base(name) {
       _subscriptionHandle = new StreamTokenSource();
       _baseStream = baseStream;
-      _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority = priority);
+      _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority);
       _baseStream.OnTerminate(Dispose, _subscriptionHandle.Token);
-      UnlockMode = unlockMode;
     }
 
     /// <summary>

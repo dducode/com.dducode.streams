@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace Streams.StreamActions.Components {
 
@@ -10,6 +9,8 @@ namespace Streams.StreamActions.Components {
       set {
         if (value <= 0)
           throw new ArgumentOutOfRangeException(nameof(value), "Delta should be positive");
+
+        _tickRate = 1;
         _delta = value;
       }
     }
@@ -21,8 +22,8 @@ namespace Streams.StreamActions.Components {
       set {
         if (value == 0)
           throw new ArgumentOutOfRangeException(nameof(value), "Tick rate cannot be zero");
-        if (_delta.HasValue)
-          Debug.LogWarning("Tick rate has no effect when delta is set");
+
+        _delta = null;
         _tickRate = value;
       }
     }
