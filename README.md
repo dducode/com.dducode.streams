@@ -41,7 +41,7 @@ UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
 You can use `StreamTask` inside the stream execution only. Also, you can convert `Task`, `UniTask` or `Awaitable` to `StreamTask` using extension methods.
 `StreamTask` allows code execution to continue in the same stream
 
-If you want to separate your persistent action, you can pass coroutine to the stream
+If you want to split the execution of an action over multiple frames, you can pass a coroutine to a stream
 
 ```csharp
 UnityPlayerLoop.GetStream<Update>().Add(Coroutine);
@@ -70,7 +70,7 @@ is requested, the subscription will be destroyed. Also, you can configure the de
 UnityPlayerLoop.GetStream<Update>().Add(deltaTime => Debug.Log(deltaTime)).SetDelta(0.5f); // will be executed twice per second
 ```
 
-You can adjust either delta or tick rate at the same time
+You can set either delta or tick rate, but not both at the same time
 
 ## Streams lifetime
 
