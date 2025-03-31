@@ -99,4 +99,4 @@ var customStream = new ManagedExecutionStream(UnityPlayerLoop.GetStream<Update>(
 customStream.Add(deltaTime => Debug.Log(deltaTime));
 ```
 
-You can also lock a stream with a token, join it with another stream, reconnect to another base stream, and terminate it
+You can also join a stream with another stream, reconnect to another base stream, and terminate it
