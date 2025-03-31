@@ -77,7 +77,7 @@ namespace Streams.Tests {
 
       ExecutionStream baseStream = UnityPlayerLoop.GetStream<FixedUpdate>();
       var stream = new ManagedExecutionStream(baseStream);
-      disposeHandle.Register(stream.Dispose);
+      disposeHandle.Token.Register(stream.Dispose);
 
       stream.Add(deltaTime => Debug.Log(deltaTime))
         .SetDelta(0.1f);
@@ -97,7 +97,7 @@ namespace Streams.Tests {
       var firstLockHandle = new StreamTokenSource();
       var secondLockHandle = new StreamTokenSource();
       var thirdLockHandle = new StreamTokenSource();
-      lockHandle.Register(() => {
+      lockHandle.Token.Register(() => {
         firstLockHandle.Release();
         secondLockHandle.Release();
         thirdLockHandle.Release();
@@ -107,7 +107,7 @@ namespace Streams.Tests {
 
       ExecutionStream baseStream = UnityPlayerLoop.GetStream<FixedUpdate>();
       var stream = new ManagedExecutionStream(baseStream);
-      disposeHandle.Register(stream.Dispose);
+      disposeHandle.Token.Register(stream.Dispose);
 
       stream.Add(deltaTime => Debug.Log(deltaTime))
         .SetDelta(0.1f);

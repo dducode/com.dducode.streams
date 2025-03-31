@@ -54,7 +54,7 @@ namespace Streams {
 
     private static ExecutionStream CreateStream(Type systemType) {
       var stream = new ExecutionStream(NamesUtility.CreateProfilerSampleName(systemType));
-      _streamsCancellation.Register(stream.Terminate);
+      _streamsCancellation.Token.Register(stream.Terminate);
 
       _connectedStreams.Add(systemType, stream);
       StreamConnector.Connect(stream, systemType);

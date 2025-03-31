@@ -6,17 +6,10 @@ using UnityEngine;
 namespace Streams {
 
   /// <summary>
-  /// <p> The custom stream that you can control. You can <see cref="Lock">lock</see> this stream, <see cref="Join">join</see> another
-  /// stream with it, and <see cref="Reconnect">reconnect</see> to another stream. </p>
+  /// <p> The custom stream that you can control. You can <see cref="Join">join</see> another stream with it and <see cref="Reconnect">reconnect</see> to another stream. </p>
   /// <p> You can also configure the <see cref="Priority"/> of the stream, <see cref="Delta"/> and <see cref="TickRate"/> of the stream execution </p>
   /// </summary>
   public sealed class ManagedExecutionStream : ExecutionStream, IDisposable, IJoinable<ManagedExecutionStream> {
-
-    public bool Locked => _lockers > 0;
-
-    /// <inheritdoc cref="StreamUnlockMode"/>
-    /// <remarks> The unlock behavior is set when the stream is created and doesn't change during the lifetime of the stream </remarks>
-    public StreamUnlockMode UnlockMode { get; set; } = StreamUnlockMode.WhenAll;
 
     /// <summary>
     /// Gets and sets the priority of the stream relative to other streams of the parent stream
@@ -97,7 +90,6 @@ namespace Streams {
     private StreamTokenSource _subscriptionHandle;
     private ExecutionStream _baseStream;
     private PersistentStreamAction _execution;
-    private int _lockers;
 
     public ManagedExecutionStream(
       ExecutionStream baseStream,
@@ -107,27 +99,6 @@ namespace Streams {
       _baseStream = baseStream;
       _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority);
       _baseStream.OnTerminate(Dispose, _subscriptionHandle.Token);
-    }
-
-    /// <summary>
-    /// Call this to lock the stream on a token
-    /// </summary>
-    /// <seealso cref="UnlockMode"/>
-    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
-    public void Lock(StreamToken lockToken) {
-      ValidateStreamState();
-      switch (UnlockMode) {
-        case StreamUnlockMode.WhenAll:
-          _lockers++;
-          lockToken.Register(() => _lockers--);
-          break;
-        case StreamUnlockMode.WhenAny:
-          _lockers = 1;
-          lockToken.Register(() => _lockers = 0);
-          break;
-        default:
-          throw new ArgumentOutOfRangeException();
-      }
     }
 
     /// <summary>
@@ -189,15 +160,6 @@ namespace Streams {
       _subscriptionHandle = null;
       _execution = null;
       Terminate();
-    }
-
-    protected override bool CanExecute() {
-      return base.CanExecute() && !Locked;
-    }
-
-    private void ValidateStreamState() {
-      if (State is StreamState.Terminating or StreamState.Terminated)
-        throw new StreamDisposedException(ToString());
     }
 
   }

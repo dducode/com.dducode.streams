@@ -13,7 +13,7 @@ namespace Streams.StreamHolders {
     public SceneStreamsHolder(Scene scene, StreamToken disposeToken) {
       _scene = scene;
       disposeToken.Register(_disposeHandle.Release);
-      _disposeHandle.Register(Dispose);
+      _disposeHandle.Token.Register(Dispose);
       SceneManager.activeSceneChanged += OnActiveSceneChanged;
       SceneManager.sceneUnloaded += OnSceneUnloaded;
     }
@@ -27,7 +27,7 @@ namespace Streams.StreamHolders {
     }
 
     internal void OnDispose(Action onDispose) {
-      _disposeHandle.Register(onDispose);
+      _disposeHandle.Token.Register(onDispose);
     }
 
     private ExecutionStream CreateStream(Type systemType) {
@@ -36,7 +36,7 @@ namespace Streams.StreamHolders {
         Priority = priority
       };
       _streams.Add(systemType, stream);
-      _disposeHandle.Register(stream.Dispose);
+      _disposeHandle.Token.Register(stream.Dispose);
       return stream;
     }
 

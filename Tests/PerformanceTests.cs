@@ -27,11 +27,11 @@ namespace Streams.Tests {
     public void ManyStreamsTest() {
       var sts = new StreamTokenSource();
       var baseStream = new ExecutionStream("base");
-      sts.Register(baseStream.Terminate);
+      sts.Token.Register(baseStream.Terminate);
 
       for (var i = 0; i < 1000; i++) {
         var stream = new ExecutionStream($"Stream {i}");
-        sts.Register(stream.Terminate);
+        sts.Token.Register(stream.Terminate);
         baseStream.Add(stream.Update);
         stream.Add(_ => { });
       }
@@ -50,7 +50,7 @@ namespace Streams.Tests {
       var stream = new ExecutionStream("Stream") {
         WorkStrategy = ParallelWorkStrategy.Performance
       };
-      sts.Register(stream.Terminate);
+      sts.Token.Register(stream.Terminate);
 
       Action<float> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();
@@ -85,7 +85,7 @@ namespace Streams.Tests {
       var stream = new ExecutionStream("Stream") {
         WorkStrategy = strategy
       };
-      sts.Register(stream.Terminate);
+      sts.Token.Register(stream.Terminate);
 
       Action<float> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();

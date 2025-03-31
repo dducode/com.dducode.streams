@@ -14,7 +14,7 @@ namespace Streams.Tests.StateMachineTests {
 
       var finalState = new FinalState();
       var fsm = new StateMachine<Update>(new EntryState(), new HelloState(), finalState);
-      disposeSource.Register(fsm.Dispose);
+      disposeSource.Token.Register(fsm.Dispose);
 
       while (fsm.CurrentState != finalState)
         await Task.Yield();

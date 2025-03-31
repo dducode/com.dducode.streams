@@ -45,6 +45,8 @@ namespace Streams {
     /// <inheritdoc cref="StreamState"/>
     public StreamState State { get; private set; }
 
+    public bool Locked => _lockers > 0;
+
     private static readonly Stack<ExecutionStream> _streamsStack = new();
 
     private Action _terminateCallbacks;
@@ -58,6 +60,8 @@ namespace Streams {
 
     private readonly string _name;
     private readonly string _profilerName;
+
+    private int _lockers;
 
     internal ExecutionStream(string name) {
       _name = name;
@@ -212,6 +216,16 @@ namespace Streams {
     }
 
     /// <summary>
+    /// Call this to lock the stream on a token
+    /// </summary>
+    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
+    public void Lock(StreamToken lockToken) {
+      ValidateStreamState();
+      _lockers++;
+      lockToken.Register(() => _lockers--);
+    }
+
+    /// <summary>
     /// Adds the handler that will be called when the stream is terminated
     /// </summary>
     /// <exception cref="ArgumentNullException"> Threw if the passed handler is null </exception>
@@ -236,15 +250,16 @@ namespace Streams {
       return _name;
     }
 
-    protected virtual bool CanExecute() {
-      return _actionsStorage.Count != 0 || _parallelActionsStorage.Count != 0;
-    }
-
     protected void CopyFrom(ExecutionStream other) {
       _actionsStorage.CopyFrom(other._actionsStorage);
       _parallelActionsStorage.CopyFrom(other._parallelActionsStorage);
       _delayedCallbacks += other._delayedCallbacks;
       _terminateCallbacks += other._terminateCallbacks;
+    }
+
+    protected void ValidateStreamState() {
+      if (State is StreamState.Terminating or StreamState.Terminated)
+        throw new StreamDisposedException(ToString());
     }
 
     internal void Update(float deltaTime) {
@@ -294,10 +309,14 @@ namespace Streams {
       streamAction.OnCancel(() => _actionsStorage.Add(shutdownAction));
     }
 
+    private bool CanExecute() {
+      return (_actionsStorage.Count != 0 || _parallelActionsStorage.Count != 0) && !Locked;
+    }
+
     private void ValidateExecution() {
       switch (State) {
         case StreamState.Terminating or StreamState.Terminated:
-          throw new StreamsException("Cannot execute disposed stream");
+          throw new StreamDisposedException(ToString());
         case StreamState.Running:
           State = StreamState.Invalid;
           Terminate();
@@ -347,11 +366,7 @@ namespace Streams {
     }
 
     private void ValidateAddAction(Delegate action) {
-      switch (State) {
-        case StreamState.Terminating or StreamState.Terminated:
-          throw new StreamDisposedException(ToString());
-      }
-
+      ValidateStreamState();
       if (action == null)
         throw new ArgumentNullException(nameof(action));
     }
