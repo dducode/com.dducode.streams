@@ -6,10 +6,6 @@ namespace Streams.Internal {
 
   internal static class SystemManager {
 
-    internal static void SetupSystem(PlayerLoopSystem newSystem, Type systemType) {
-      SetupSystem(systemType, newSystem);
-    }
-
     internal static void SetupSystem(Type baseSystemType, PlayerLoopSystem newSystem) {
       PlayerLoopSystem system = PlayerLoop.GetCurrentPlayerLoop();
       if (!FindSystemAndSetup(baseSystemType, ref system, newSystem))
@@ -18,6 +14,9 @@ namespace Streams.Internal {
     }
 
     internal static void RemoveSystem(Type baseSystemType, Type systemType) {
+      if (baseSystemType == null)
+        throw new InvalidOperationException("Cannot remove base system from player loop");
+
       PlayerLoopSystem system = PlayerLoop.GetCurrentPlayerLoop();
       if (!FindSystemAndRemove(systemType, baseSystemType, ref system))
         throw new StreamsException("Cannot remove system because base system doesn't exist");

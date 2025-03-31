@@ -4,6 +4,7 @@ using Streams.Exceptions;
 using Streams.Internal;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.LowLevel;
 using UnityEngine.PlayerLoop;
 
 namespace Streams {
@@ -11,7 +12,9 @@ namespace Streams {
   public static class UnityPlayerLoop {
 
     private static readonly Dictionary<Type, ExecutionStream> _connectedStreams = new();
+    private static readonly RegisteredSystem _systemsTree = new(null, null);
     private static StreamTokenSource _streamsCancellation = new();
+    private static bool _initialized;
 
 #if UNITY_EDITOR
     static UnityPlayerLoop() {
@@ -19,6 +22,8 @@ namespace Streams {
         if (state == PlayModeStateChange.ExitingPlayMode) {
           _streamsCancellation.Release();
           _connectedStreams.Clear();
+          UnregisterSystems();
+          _initialized = false;
         }
       };
     }
@@ -36,20 +41,38 @@ namespace Streams {
       if (!EditorApplication.isPlaying)
         throw new StreamsException("Cannot get stream when editor is not playing");
 #endif
+      if (!_initialized)
+        Initialize();
+
       return GetStream(typeof(TSystem));
+    }
+
+    public static void RegisterSystem<TBaseSystem, TSystem>() {
+      if (!_initialized)
+        Initialize();
+
+      Type baseSystemType = typeof(TBaseSystem);
+      Type systemType = typeof(TSystem);
+
+      RegisterSystemsInTree(baseSystemType, systemType);
+      var newSystem = new PlayerLoopSystem { type = systemType };
+      SystemManager.SetupSystem(baseSystemType, newSystem);
     }
 
     internal static ExecutionStream GetStream(Type systemType) {
       return _connectedStreams.TryGetValue(systemType, out ExecutionStream stream) ? stream : CreateStream(systemType);
     }
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void Initialize() {
-      _streamsCancellation = new StreamTokenSource();
+      if (_initialized)
+        return;
 
+      _streamsCancellation = new StreamTokenSource();
       CreateStream(typeof(Update));
       CreateStream(typeof(FixedUpdate));
       CreateStream(typeof(PreLateUpdate));
+      _initialized = true;
     }
 
     private static ExecutionStream CreateStream(Type systemType) {
@@ -57,13 +80,37 @@ namespace Streams {
       _streamsCancellation.Token.Register(stream.Terminate);
 
       _connectedStreams.Add(systemType, stream);
+      RegisterSystemsInTree(systemType, typeof(ExecutionStream));
       StreamConnector.Connect(stream, systemType);
 
-      stream.OnTerminate(() => {
-        _connectedStreams.Remove(systemType);
-        StreamConnector.DisconnectStreamAt(systemType);
-      });
+      stream.OnTerminate(() => _connectedStreams.Remove(systemType));
       return stream;
+    }
+
+    private static void RegisterSystemsInTree(Type baseSystemType, Type systemType) {
+      RegisteredSystem baseSystem;
+
+      if (_systemsTree.TryGetRegisteredSystem(baseSystemType, out RegisteredSystem system)) {
+        baseSystem = system;
+      }
+      else {
+        baseSystem = new RegisteredSystem(_systemsTree, baseSystemType);
+        _systemsTree.SubSystems.Add(baseSystemType, baseSystem);
+      }
+
+      baseSystem.SubSystems.Add(systemType, new RegisteredSystem(baseSystem, systemType));
+    }
+
+    private static void UnregisterSystems() {
+      UnregisterSystem(_systemsTree);
+      _systemsTree.Clear();
+    }
+
+    private static void UnregisterSystem(RegisteredSystem system) {
+      foreach (RegisteredSystem subSystem in system.SubSystems.Values)
+        UnregisterSystem(subSystem);
+      if (system.BaseSystem is { SystemType: not null })
+        SystemManager.RemoveSystem(system.BaseSystem.SystemType, system.SystemType);
     }
 
   }
