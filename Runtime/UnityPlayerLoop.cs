@@ -47,18 +47,6 @@ namespace Streams {
       return GetStream(typeof(TSystem));
     }
 
-    public static void RegisterSystem<TBaseSystem, TSystem>() {
-      if (!_initialized)
-        Initialize();
-
-      Type baseSystemType = typeof(TBaseSystem);
-      Type systemType = typeof(TSystem);
-
-      RegisterSystemsInTree(baseSystemType, systemType);
-      var newSystem = new PlayerLoopSystem { type = systemType };
-      SystemManager.SetupSystem(baseSystemType, newSystem);
-    }
-
     internal static ExecutionStream GetStream(Type systemType) {
       return _connectedStreams.TryGetValue(systemType, out ExecutionStream stream) ? stream : CreateStream(systemType);
     }
@@ -80,8 +68,13 @@ namespace Streams {
       _streamsCancellation.Token.Register(stream.Terminate);
 
       _connectedStreams.Add(systemType, stream);
-      RegisterSystemsInTree(systemType, typeof(ExecutionStream));
-      StreamConnector.Connect(stream, systemType);
+      RegisterSystemsInTree(systemType, typeof(StreamRunner));
+      var runner = new StreamRunner(stream, SystemIdentifier.IsFixedSystem(systemType));
+      var newSystem = new PlayerLoopSystem {
+        type = typeof(StreamRunner),
+        updateDelegate = runner.Run
+      };
+      SystemManager.SetupSystem(systemType, newSystem);
 
       stream.OnTerminate(() => _connectedStreams.Remove(systemType));
       return stream;
