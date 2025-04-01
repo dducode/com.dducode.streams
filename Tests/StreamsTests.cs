@@ -38,7 +38,7 @@ namespace Streams.Tests {
     public async Task TemporaryUpdateTest() {
       var tcs = new TaskCompletionSource<bool>();
 
-      UnityPlayerLoop.GetStream<Update>().AddTemporal(2, delta => {
+      UnityPlayerLoop.GetStream<Update>().Add(2, delta => {
         Debug.Log(delta);
       }).SetDelta(0.5f).OnComplete(() => tcs.SetResult(true));
 
@@ -49,7 +49,7 @@ namespace Streams.Tests {
     public async Task FixedUpdateTest() {
       var tcs = new TaskCompletionSource<bool>();
 
-      UnityPlayerLoop.GetStream<FixedUpdate>().AddTemporal(0.2f, delta => {
+      UnityPlayerLoop.GetStream<FixedUpdate>().Add(0.2f, delta => {
         Debug.Log(delta);
       }).SetDelta(0.002f).OnComplete(() => tcs.SetResult(true));
 
@@ -62,7 +62,7 @@ namespace Streams.Tests {
       var completionHandle = new StreamTokenSource();
 
       UnityPlayerLoop.GetStream<Update>()
-        .AddConditional(() => !completionHandle.Released, delta => Debug.Log(delta))
+        .Add(() => !completionHandle.Released, delta => Debug.Log(delta))
         .SetDelta(0.1f); // TODO: fix test
 
       UnityPlayerLoop.GetStream<Update>().AddTimer(2, () => completionHandle.Release());

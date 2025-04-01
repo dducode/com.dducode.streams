@@ -114,9 +114,8 @@ namespace Streams {
       if (other.Priority < Priority)
         return other.Join(this);
 
-      ExecutionStream runningStream = RunningStream;
-      if (runningStream == this || runningStream == other)
-        throw new StreamsException($"Cannot join a running stream ({runningStream})");
+      if (RunningStream == this || RunningStream == other)
+        throw new StreamsException($"Cannot join a running stream ({RunningStream})");
 
       CopyFrom(other);
       other.Dispose();

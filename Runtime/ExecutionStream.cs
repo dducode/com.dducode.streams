@@ -75,8 +75,8 @@ namespace Streams {
     /// <param name="action"> The action to be performed </param>
     /// <param name="token"> Token for cancelling an action </param>
     /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
-    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
-    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     public PersistentStreamAction Add([NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
@@ -98,22 +98,24 @@ namespace Streams {
     }
 
     /// <summary>
-    /// Adds a new action that will be executed in parallel
+    /// Adds a new action to be performed
     /// </summary>
+    /// <param name="condition"> The action will be performed when the condition is true </param>
     /// <param name="action"> The action to be performed </param>
     /// <param name="token"> Token for cancelling an action </param>
-    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
-    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
-    public PersistentStreamAction AddParallel([NotNull] Action<float> action, StreamToken token = default) {
+    /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
+    public ConditionalStreamAction Add(
+      [NotNull] Func<bool> condition, [NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue
+    ) {
       ValidateAddAction(action);
+      if (condition == null)
+        throw new ArgumentNullException(nameof(condition));
 
-      var streamAction = new PersistentStreamAction(action, token, uint.MaxValue);
-      _parallelActionsStorage.Add(streamAction);
+      var streamAction = new ConditionalStreamAction(action, condition, token, priority);
+      _actionsStorage.Add(streamAction);
       return streamAction;
-    }
-
-    public void AddParallel([NotNull] IUpdatable updatable, StreamToken token = default) {
-      AddUpdatable(updatable, _parallelActionsStorage, token, uint.MaxValue);
     }
 
     /// <summary>
@@ -123,12 +125,12 @@ namespace Streams {
     /// <param name="action"> The action to be performed </param>
     /// <param name="token"> Token for cancelling an action </param>
     /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
-    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
-    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     /// <remarks> It is worth distinguishing a temporary action from a timer.
     /// A temporary action is executed every tick of the stream for a specified time,
     /// and a timer executes the action once after the time has elapsed. </remarks>
-    public TemporalStreamAction AddTemporal(float time, [NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
+    public TemporalStreamAction Add(float time, [NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
       if (time <= 0) {
         Debug.LogWarning($"Time is negative or zero: {time}");
         return null;
@@ -142,24 +144,22 @@ namespace Streams {
     }
 
     /// <summary>
-    /// Adds a new action to be performed
+    /// Adds a new action that will be executed in parallel
     /// </summary>
-    /// <param name="condition"> The action will be performed when the condition is true </param>
     /// <param name="action"> The action to be performed </param>
     /// <param name="token"> Token for cancelling an action </param>
-    /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
-    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
-    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
-    public ConditionalStreamAction AddConditional(
-      [NotNull] Func<bool> condition, [NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue
-    ) {
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
+    public PersistentStreamAction AddParallel([NotNull] Action<float> action, StreamToken token = default) {
       ValidateAddAction(action);
-      if (condition == null)
-        throw new ArgumentNullException(nameof(condition));
 
-      var streamAction = new ConditionalStreamAction(action, condition, token, priority);
-      _actionsStorage.Add(streamAction);
+      var streamAction = new PersistentStreamAction(action, token, uint.MaxValue);
+      _parallelActionsStorage.Add(streamAction);
       return streamAction;
+    }
+
+    public void AddParallel([NotNull] IUpdatable updatable, StreamToken token = default) {
+      AddUpdatable(updatable, _parallelActionsStorage, token, uint.MaxValue);
     }
 
     /// <summary>
@@ -168,8 +168,8 @@ namespace Streams {
     /// <param name="action"> The action to be performed </param>
     /// <param name="token"> Token for cancelling an action </param>
     /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
-    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
-    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     public OnceStreamAction AddOnce([NotNull] Action action, StreamToken token = default, uint priority = uint.MaxValue) {
       ValidateAddAction(action);
 
@@ -183,8 +183,8 @@ namespace Streams {
     /// </summary>
     /// <param name="action"> The action to be performed </param>
     /// <param name="token"> Token for cancelling an action </param>
-    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
-    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     public AsyncStreamAction AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
@@ -199,8 +199,8 @@ namespace Streams {
     /// <param name="time"> The time after which the action will be executed </param>
     /// <param name="onComplete"> The action which will be executed </param>
     /// <param name="token"> Token for cancelling a timer </param>
-    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
-    /// <exception cref="ArgumentNullException"> Threw if the passed action is null </exception>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     /// <remarks> It is worth distinguishing a timer from a temporary action.
     /// A temporary action is executed every tick of the stream for a specified time,
     /// and a timer executes the action once after the time has elapsed. </remarks>
@@ -218,8 +218,17 @@ namespace Streams {
     /// <summary>
     /// Call this to lock the stream on a token
     /// </summary>
-    /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
+    /// <exception cref="InvalidOperationException">
+    /// Occurs when attempting to lock a stream inside its execution. Example:
+    /// <code>
+    /// stream.AddOnce(() => stream.Lock(token));
+    /// </code>
+    /// </exception>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     public void Lock(StreamToken lockToken) {
+      if (State == StreamState.Running)
+        throw new InvalidOperationException("Cannot lock a stream inside its execution");
+
       ValidateStreamState();
       _lockers++;
       lockToken.Register(() => _lockers--);
@@ -228,8 +237,8 @@ namespace Streams {
     /// <summary>
     /// Adds the handler that will be called when the stream is terminated
     /// </summary>
-    /// <exception cref="ArgumentNullException"> Threw if the passed handler is null </exception>
     /// <remarks> If the stream has already been disposed, the handler will be called immediately </remarks>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed handler is null </exception>
     public void OnTerminate([NotNull] Action onTermination, StreamToken subscriptionToken = default) {
       if (onTermination == null)
         throw new ArgumentNullException(nameof(onTermination));
