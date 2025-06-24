@@ -1,39 +1,35 @@
 using System;
+using System.Threading;
 using Streams.StreamActions.Components;
 using UnityEngine;
 
 namespace Streams.StreamActions {
 
-  public sealed class ConditionalStreamAction : StreamAction, IConfigurable<ConditionalStreamAction> {
+  public sealed class PersistentAction : SelfClosingAction<PersistentAction>, IConfigurable<PersistentAction> {
 
-    private protected override Delegate Action => _action;
+    public override float DeltaTime => _configuration.HasDelta ? _configuration.Delta : _accumulatedDeltaTime;
 
-    private readonly Action<float> _action;
     private readonly Configuration _configuration = new();
 
-    private readonly Func<bool> _condition;
     private ulong _ticks;
     private float _accumulatedDeltaTime;
 
-    internal ConditionalStreamAction(Action<float> action, Func<bool> condition, StreamToken cancellationToken, uint priority) :
-      base(cancellationToken, priority) {
-      _action = action;
-      _condition = condition;
+    internal PersistentAction(Action<PersistentAction> action, CancellationToken cancellationToken) : base(action, cancellationToken) {
     }
 
-    public ConditionalStreamAction SetDelta(float value) {
+    public PersistentAction SetDelta(float value) {
       _configuration.Delta = value;
       _accumulatedDeltaTime = 0;
       return this;
     }
 
-    public ConditionalStreamAction ResetDelta() {
+    public PersistentAction ResetDelta() {
       _configuration.ResetDelta();
       _accumulatedDeltaTime = 0;
       return this;
     }
 
-    public ConditionalStreamAction SetTickRate(uint value) {
+    public PersistentAction SetTickRate(uint value) {
       _configuration.TickRate = value;
       _accumulatedDeltaTime = 0;
       return this;
@@ -48,8 +44,7 @@ namespace Streams.StreamActions {
 
       if (!_configuration.HasDelta) {
         if (_ticks % _configuration.TickRate == 0) {
-          if (_condition())
-            _action(_accumulatedDeltaTime);
+          InvokeAction();
           _accumulatedDeltaTime = 0;
         }
 
@@ -57,8 +52,7 @@ namespace Streams.StreamActions {
       }
 
       while (_accumulatedDeltaTime > _configuration.Delta || Mathf.Approximately(_accumulatedDeltaTime, _configuration.Delta)) {
-        if (_condition())
-          _action(_configuration.Delta);
+        InvokeAction();
         _accumulatedDeltaTime -= _configuration.Delta;
       }
     }

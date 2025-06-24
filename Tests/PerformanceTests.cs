@@ -1,5 +1,7 @@
 using System;
+using System.Threading;
 using NUnit.Framework;
+using Streams.StreamActions;
 using Unity.PerformanceTesting;
 using UnityEngine;
 using Random = System.Random;
@@ -25,14 +27,14 @@ namespace Streams.Tests {
 
     [Test, Performance]
     public void ManyStreamsTest() {
-      var sts = new StreamTokenSource();
+      var sts = new CancellationTokenSource();
       var baseStream = new ExecutionStream("base");
       sts.Token.Register(baseStream.Terminate);
 
       for (var i = 0; i < 1000; i++) {
         var stream = new ExecutionStream($"Stream {i}");
         sts.Token.Register(stream.Terminate);
-        baseStream.Add(stream.Update);
+        baseStream.Add(self => stream.Update(self.DeltaTime));
         stream.Add(_ => { });
       }
 
@@ -41,18 +43,18 @@ namespace Streams.Tests {
         .MeasurementCount(60)
         .Run();
 
-      sts.Release();
+      sts.Cancel();
     }
 
     [Test, Performance]
     public void ManyActionsTest([ValueSource(nameof(_executionType))] ExecutionType executionType) {
-      var sts = new StreamTokenSource();
+      var sts = new CancellationTokenSource();
       var stream = new ExecutionStream("Stream") {
         WorkStrategy = ParallelWorkStrategy.Performance
       };
       sts.Token.Register(stream.Terminate);
 
-      Action<float> work = _ => {
+      Action<PersistentAction> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();
         for (var j = 0; j < 1000; j++)
           matrix *= matrix;
@@ -76,18 +78,18 @@ namespace Streams.Tests {
         .MeasurementCount(60)
         .Run();
 
-      sts.Release();
+      sts.Cancel();
     }
 
     [Test, Performance]
     public void ParallelWorkStrategyTest([ValueSource(nameof(_parallelWorkStrategies))] ParallelWorkStrategy strategy) {
-      var sts = new StreamTokenSource();
+      var sts = new CancellationTokenSource();
       var stream = new ExecutionStream("Stream") {
         WorkStrategy = strategy
       };
       sts.Token.Register(stream.Terminate);
 
-      Action<float> work = _ => {
+      Action<PersistentAction> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();
         for (var j = 0; j < 1000; j++)
           matrix *= matrix;
@@ -101,7 +103,7 @@ namespace Streams.Tests {
         .MeasurementCount(60)
         .Run();
 
-      sts.Release();
+      sts.Cancel();
     }
 
     private static readonly Random _random = new();

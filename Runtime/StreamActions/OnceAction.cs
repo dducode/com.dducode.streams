@@ -1,20 +1,21 @@
 using System;
+using System.Threading;
 using Streams.StreamActions.Components;
 
 namespace Streams.StreamActions {
 
-  public sealed class OnceStreamAction : StreamAction, ICompletable {
+  public sealed class OnceAction : StreamAction, ICompletable {
 
     private protected override Delegate Action => _action;
 
     private readonly Action _action;
     private readonly Completion _completion = new();
 
-    internal OnceStreamAction(Action action, StreamToken cancellationToken, uint priority) : base(cancellationToken, priority) {
+    internal OnceAction(Action action, CancellationToken cancellationToken) : base(cancellationToken) {
       _action = action;
     }
 
-    public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
+    public void OnComplete(Action onComplete, CancellationToken subscriptionToken = default) {
       _completion.OnComplete(onComplete, subscriptionToken);
     }
 

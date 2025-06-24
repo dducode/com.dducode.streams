@@ -1,3 +1,4 @@
+using System.Threading;
 using Streams.StreamStateMachine;
 using UnityEngine;
 
@@ -9,7 +10,7 @@ namespace Streams.Tests.StateMachineTests {
       Debug.Log("Hello World!");
     }
 
-    protected override void OnEnter(StreamToken subscriptionToken) {
+    protected override void OnEnter(CancellationToken subscriptionToken) {
       Debug.Log("Entered HelloState");
       Stream.AddTimer(2, () => StateMachine.SetState<FinalState>(), subscriptionToken);
     }

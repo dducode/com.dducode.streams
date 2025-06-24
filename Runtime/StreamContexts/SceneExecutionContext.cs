@@ -1,18 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine.SceneManagement;
 
-namespace Streams.StreamHolders {
+namespace Streams.StreamContexts {
 
-  internal sealed class SceneStreamsHolder : IStreamsHolder {
+  internal sealed class SceneExecutionContext : IStreamExecutionContext {
 
     private readonly Scene _scene;
     private readonly Dictionary<Type, ManagedExecutionStream> _streams = new();
-    private readonly StreamTokenSource _disposeHandle = new();
+    private readonly CancellationTokenSource _disposeHandle = new();
 
-    public SceneStreamsHolder(Scene scene, StreamToken disposeToken) {
+    public SceneExecutionContext(Scene scene, CancellationToken disposeToken) {
       _scene = scene;
-      disposeToken.Register(_disposeHandle.Release);
+      disposeToken.Register(_disposeHandle.Cancel);
       _disposeHandle.Token.Register(Dispose);
       SceneManager.activeSceneChanged += OnActiveSceneChanged;
       SceneManager.sceneUnloaded += OnSceneUnloaded;
@@ -32,17 +33,22 @@ namespace Streams.StreamHolders {
 
     private ExecutionStream CreateStream(Type systemType) {
       uint priority = SceneManager.GetActiveScene() == _scene ? 0 : uint.MaxValue;
-      var stream = new ManagedExecutionStream(UnityPlayerLoop.GetStream(systemType), _scene.name) {
+      var stream = new ManagedExecutionStream(UnityPlayerLoop.GetStream(systemType), $"{_scene.name}_{systemType.Name}") {
         Priority = priority
       };
       _streams.Add(systemType, stream);
       _disposeHandle.Token.Register(stream.Dispose);
+      ExecutionContexts.All.Add(stream, this);
+      stream.OnTerminate(() => {
+        _streams.Remove(systemType);
+        ExecutionContexts.All.Remove(stream);
+      });
       return stream;
     }
 
     private void OnSceneUnloaded(Scene unloadedScene) {
       if (_scene == unloadedScene)
-        _disposeHandle.Release();
+        _disposeHandle.Cancel();
     }
 
     private void Dispose() {
@@ -59,8 +65,6 @@ namespace Streams.StreamHolders {
         ReorderStreams(uint.MaxValue);
       else if (_scene == next)
         ReorderStreams(0);
-      else
-        throw new InvalidOperationException($"Scene {_scene} is not current and is not next scene");
     }
 
     private void ReorderStreams(uint priority) {

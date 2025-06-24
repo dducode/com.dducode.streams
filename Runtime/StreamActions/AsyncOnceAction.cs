@@ -1,10 +1,11 @@
 using System;
+using System.Threading;
 using Streams.StreamActions.Components;
 using Streams.StreamTasks;
 
 namespace Streams.StreamActions {
 
-  public class AsyncStreamAction : StreamAction, ICompletable {
+  public class AsyncOnceAction : StreamAction, ICompletable {
 
     private protected override Delegate Action => _action;
 
@@ -12,11 +13,11 @@ namespace Streams.StreamActions {
     private readonly Completion _completion = new();
     private StreamTask _task;
 
-    internal AsyncStreamAction(Func<StreamTask> action, StreamToken cancellationToken) : base(cancellationToken, uint.MaxValue) {
+    internal AsyncOnceAction(Func<StreamTask> action, CancellationToken cancellationToken) : base(cancellationToken) {
       _action = action;
     }
 
-    public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
+    public void OnComplete(Action onComplete, CancellationToken subscriptionToken = default) {
       _completion.OnComplete(onComplete, subscriptionToken);
     }
 

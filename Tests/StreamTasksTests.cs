@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using Streams.Exceptions;
@@ -77,19 +78,6 @@ namespace Streams.Tests {
         tcs.SetResult(true);
       });
       Assert.IsTrue(await tcs.Task);
-    }
-
-    [Test, StreamTasks]
-    public void ErrorTest() {
-      try {
-        StreamTask.Yield();
-      }
-      catch (StreamsException exception) {
-        Debug.Log($"StreamsException was thrown; message: <b>{exception.Message}</b>");
-        return;
-      }
-
-      Assert.Fail();
     }
 
     [Test, StreamTasks]
@@ -178,12 +166,12 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task ImmediateCancellationTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var sts = new StreamTokenSource();
+      var sts = new CancellationTokenSource();
       SetFailureAfterTime(2, tcs);
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         try {
-          sts.Release();
+          sts.Cancel();
           await StreamTask.Delay(1000, sts.Token);
           tcs.SetResult(false);
         }
@@ -198,7 +186,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task DelayedCancellationTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var sts = new StreamTokenSource();
+      var sts = new CancellationTokenSource();
       SetFailureAfterTime(2, tcs);
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
@@ -210,7 +198,7 @@ namespace Streams.Tests {
           tcs.SetResult(true);
         }
       });
-      UnityPlayerLoop.GetStream<Update>().AddTimer(0.5f, () => sts.Release());
+      UnityPlayerLoop.GetStream<Update>().AddTimer(0.5f, () => sts.Cancel());
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -257,6 +245,21 @@ namespace Streams.Tests {
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.Delay(500);
       }).OnComplete(() => tcs.SetResult(true));
+
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test, StreamTasks]
+    public async Task ContinueOnStreamTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      SetFailureAfterTime(1, tcs);
+
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
+        Debug.Log($"Run on stream {ExecutionStream.RunningStream}");
+        await StreamTask.ContinueOnStream<FixedUpdate>();
+        Debug.Log($"Run on stream {ExecutionStream.RunningStream}");
+        tcs.SetResult(true);
+      });
 
       Assert.IsTrue(await tcs.Task);
     }

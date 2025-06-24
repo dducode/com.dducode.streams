@@ -1,3 +1,4 @@
+using System.Threading;
 using Streams.Internal;
 
 namespace Streams.StreamStateMachine {
@@ -8,18 +9,18 @@ namespace Streams.StreamStateMachine {
     protected IStateMachine StateMachine { get; private set; }
 
     private ManagedExecutionStream _stream;
-    private StreamTokenSource _lockHandle = new();
+    private CancellationTokenSource _lockHandle = new();
 
     protected virtual void OnInitialize() {
     }
 
-    protected virtual void OnEnter(StreamToken subscriptionToken) {
+    protected virtual void OnEnter(CancellationToken subscriptionToken) {
     }
 
     protected virtual void OnExit() {
     }
 
-    internal void Initialize<TSystem>(IStateMachine stateMachine, StreamToken disposeToken) {
+    internal void Initialize<TSystem>(IStateMachine stateMachine, CancellationToken disposeToken) {
       StateMachine = stateMachine;
       _stream = new ManagedExecutionStream(UnityPlayerLoop.GetStream<TSystem>(), NamesUtility.CreateProfilerSampleName(GetType()));
       disposeToken.Register(_stream.Dispose);
@@ -27,14 +28,14 @@ namespace Streams.StreamStateMachine {
       OnInitialize();
     }
 
-    internal void Enter(StreamToken subscriptionToken) {
-      _lockHandle.Release();
+    internal void Enter(CancellationToken subscriptionToken) {
+      _lockHandle.Cancel();
       _lockHandle = null;
       OnEnter(subscriptionToken);
     }
 
     internal void Exit() {
-      _lockHandle = new StreamTokenSource();
+      _lockHandle = new CancellationTokenSource();
       _stream.Lock(_lockHandle.Token);
       OnExit();
     }

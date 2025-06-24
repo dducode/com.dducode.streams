@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using JetBrains.Annotations;
 
 namespace Streams.StreamStateMachine {
@@ -13,8 +14,8 @@ namespace Streams.StreamStateMachine {
     public State CurrentState { get; private set; }
 
     private readonly Dictionary<Type, State> _states;
-    private readonly StreamTokenSource _disposeHandle;
-    private StreamTokenSource _stateCancelling = new();
+    private readonly CancellationTokenSource _disposeHandle;
+    private CancellationTokenSource _stateCancelling = new();
 
     public StateMachine([NotNull] params State[] states) {
       if (states == null)
@@ -23,7 +24,7 @@ namespace Streams.StreamStateMachine {
         throw new ArgumentException("Value cannot be an empty collection", nameof(states));
 
       _states = states.ToDictionary(keySelector: state => state.GetType(), elementSelector: state => state);
-      _disposeHandle = new StreamTokenSource();
+      _disposeHandle = new CancellationTokenSource();
       foreach (State state in states)
         state.Initialize<TSystem>(this, _disposeHandle.Token);
       EnterToState(states.First());
@@ -44,13 +45,13 @@ namespace Streams.StreamStateMachine {
     }
 
     private void ExitFromCurrentState() {
-      _stateCancelling.Release();
+      _stateCancelling.Cancel();
       CurrentState.Exit();
     }
 
     private void EnterToState(State state) {
       CurrentState = state;
-      _stateCancelling = new StreamTokenSource();
+      _stateCancelling = new CancellationTokenSource();
       state.Enter(_stateCancelling.Token);
     }
 

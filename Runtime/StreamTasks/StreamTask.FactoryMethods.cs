@@ -1,20 +1,31 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using JetBrains.Annotations;
+using Streams.StreamContexts;
 using Streams.StreamTasks.Internal;
 
 namespace Streams.StreamTasks {
 
   public partial class StreamTask {
 
-    public static StreamTask Yield(StreamToken token = default) {
+    public static StreamTask Yield() {
       var task = new StreamTask();
-      StreamTaskHelper.GetRunningStream().AddOnce(task.SetResult, token);
-      token.Register(task.SetCanceled);
+      StreamTaskHelper.GetRunningStream().AddOnce(task.SetResult);
       return task;
     }
 
-    public static StreamTask Delay(int milliseconds, StreamToken token = default) {
+    public static StreamTask ContinueOnStream<TSystemType>() {
+      var task = new StreamTask();
+      Contexts.All.GetValueOrDefault(StreamTaskHelper.GetRunningStream()).GetStream<TSystemType>().AddOnce(task.SetResult);
+      return task;
+    }
+
+    public static StreamTask Delay(int milliseconds) {
+      return Delay(milliseconds, CancellationToken.None);
+    }
+
+    public static StreamTask Delay(int milliseconds, CancellationToken cancellationToken) {
       switch (milliseconds) {
         case < 0:
           throw new ArgumentOutOfRangeException(nameof(milliseconds));
@@ -23,30 +34,34 @@ namespace Streams.StreamTasks {
       }
 
       var task = new StreamTask();
-      StreamTaskHelper.GetRunningStream().AddTimer(milliseconds / 1000f, task.SetResult, token);
-      token.Register(task.SetCanceled);
+      StreamTaskHelper.GetRunningStream().AddTimer(milliseconds / 1000f, task.SetResult, cancellationToken);
+      cancellationToken.Register(task.SetCanceled);
       return task;
     }
 
-    public static StreamTask WaitWhile([NotNull] Func<bool> condition, StreamToken token = default) {
+    public static StreamTask WaitWhile([NotNull] Func<bool> condition) {
+      return WaitWhile(condition, CancellationToken.None);
+    }
+
+    public static StreamTask WaitWhile([NotNull] Func<bool> condition, CancellationToken cancellationToken) {
       if (condition == null)
         throw new ArgumentNullException(nameof(condition));
       if (!condition())
         return CompletedTask;
 
       var task = new StreamTask();
-      var cts = new StreamTokenSource();
+      var cts = new CancellationTokenSource();
       StreamTaskHelper.GetRunningStream().Add(_ => {
         if (condition())
           return;
 
         task.SetResult();
-        cts.Release();
+        cts.Cancel();
       }, cts.Token);
 
-      token.Register(() => {
+      cancellationToken.Register(() => {
         task.SetCanceled();
-        cts.Release();
+        cts.Cancel();
       });
       return task;
     }

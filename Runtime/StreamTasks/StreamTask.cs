@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using JetBrains.Annotations;
 using Streams.StreamTasks.Internal;
 
@@ -54,7 +55,7 @@ namespace Streams.StreamTasks {
       return nextTask;
     }
 
-    public StreamTask WithCancellation(StreamToken token) {
+    public StreamTask WithCancellation(CancellationToken token) {
       token.Register(SetCanceled);
       return this;
     }

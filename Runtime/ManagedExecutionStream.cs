@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Streams.Exceptions;
 using Streams.StreamActions;
 using UnityEngine;
@@ -87,17 +88,18 @@ namespace Streams {
     private uint _priority = uint.MaxValue;
     private float? _delta;
     private uint _tickRate = 1;
-    private StreamTokenSource _subscriptionHandle;
+    private CancellationTokenSource _subscriptionHandle;
     private ExecutionStream _baseStream;
-    private PersistentStreamAction _execution;
+    private PersistentAction _execution;
 
     public ManagedExecutionStream(
       ExecutionStream baseStream,
       string name = nameof(ManagedExecutionStream)
     ) : base(name) {
-      _subscriptionHandle = new StreamTokenSource();
+      _subscriptionHandle = new CancellationTokenSource();
       _baseStream = baseStream;
-      _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority);
+      _execution = _baseStream.Add(self => Update(self.DeltaTime), _subscriptionHandle.Token);
+      _execution.Priority = _priority;
       _baseStream.OnTerminate(Dispose, _subscriptionHandle.Token);
     }
 
@@ -130,15 +132,17 @@ namespace Streams {
     /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     public void Reconnect(ExecutionStream stream, uint? priority = null) {
       ValidateStreamState();
-      _subscriptionHandle?.Release();
-      _subscriptionHandle = new StreamTokenSource();
+      _subscriptionHandle?.Cancel();
+      _subscriptionHandle = new CancellationTokenSource();
 
       _baseStream = stream;
-      _execution = _baseStream.Add(Update, _subscriptionHandle.Token, _priority = priority ?? _priority).SetTickRate(_tickRate);
+      _execution = _baseStream.Add(self => Update(self.DeltaTime), _subscriptionHandle.Token).SetTickRate(_tickRate);
       _baseStream.OnTerminate(Dispose, _subscriptionHandle.Token);
 
       if (_delta.HasValue)
         _execution.SetDelta(_delta.Value);
+      if (priority != null)
+        _execution.Priority = _priority;
     }
 
     /// <summary>
@@ -155,7 +159,7 @@ namespace Streams {
       if (State is StreamState.Terminating or StreamState.Terminated)
         return;
 
-      _subscriptionHandle.Release();
+      _subscriptionHandle.Cancel();
       _subscriptionHandle = null;
       _execution = null;
       Terminate();

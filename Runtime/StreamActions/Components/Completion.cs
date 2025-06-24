@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace Streams.StreamActions.Components {
 
@@ -7,11 +8,11 @@ namespace Streams.StreamActions.Components {
     private Action _completeCallbacks;
     private bool _completed;
 
-    public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
+    public void OnComplete(Action onComplete, CancellationToken subscriptionToken = default) {
       if (onComplete == null)
         throw new ArgumentNullException(nameof(onComplete));
 
-      if (subscriptionToken.Released)
+      if (subscriptionToken.IsCancellationRequested)
         return;
 
       if (_completed) {

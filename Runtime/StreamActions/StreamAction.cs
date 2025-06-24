@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using JetBrains.Annotations;
 
 namespace Streams.StreamActions {
@@ -17,15 +18,15 @@ namespace Streams.StreamActions {
       }
     }
 
-    internal int Id { get; } = NextId;
-
-    internal uint Priority {
+    public uint Priority {
       get => _priority;
       set {
         _priority = value;
         OnPriorityChanged?.Invoke();
       }
     }
+
+    internal int Id { get; } = NextId;
 
     internal event Action OnPriorityChanged;
     private protected abstract Delegate Action { get; }
@@ -36,17 +37,17 @@ namespace Streams.StreamActions {
     private bool _canceled;
     private uint _priority;
 
-    private protected StreamAction(StreamToken cancellationToken, uint priority) {
+    private protected StreamAction(CancellationToken cancellationToken) {
       cancellationToken.Register(() => _canceled = true);
-      _priority = priority;
+      _priority = uint.MaxValue;
       _name = GetType().Name;
     }
 
-    public void OnCancel([NotNull] Action onCancel, StreamToken subscriptionToken = default) {
+    public void OnCancel([NotNull] Action onCancel, CancellationToken subscriptionToken = default) {
       if (onCancel == null)
         throw new ArgumentNullException(nameof(onCancel));
 
-      if (subscriptionToken.Released)
+      if (subscriptionToken.IsCancellationRequested)
         return;
 
       if (_canceled) {

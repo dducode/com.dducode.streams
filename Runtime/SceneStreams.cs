@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Streams.Exceptions;
-using Streams.StreamHolders;
+using Streams.StreamContexts;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Assertions;
@@ -11,8 +12,8 @@ namespace Streams {
 
   public static class SceneStreams {
 
-    private static readonly Dictionary<Scene, SceneStreamsHolder> _streamsHolders = new();
-    private static StreamTokenSource _disposeHandle;
+    private static readonly Dictionary<Scene, IStreamExecutionContext> _streamsContexts = new();
+    private static CancellationTokenSource _disposeHandle;
 
 #if UNITY_EDITOR
     static SceneStreams() {
@@ -30,28 +31,28 @@ namespace Streams {
     }
 
     internal static ExecutionStream GetStream(this Scene scene, Type systemType) {
-      return GetStreamsHolder(scene).GetStream(systemType);
+      return GetStreamsContext(scene).GetStream(systemType);
     }
 
-    internal static IStreamsHolder GetStreamsHolder(this Scene scene) {
+    private static IStreamExecutionContext GetStreamsContext(this Scene scene) {
       if (!scene.IsValid())
-        throw new StreamsException("Cannot get streams holder from invalid scene");
+        throw new StreamsException("Cannot get streams context from invalid scene");
 
-      if (!_streamsHolders.ContainsKey(scene))
-        CreateStreamsHolderForScene(scene);
+      if (!_streamsContexts.ContainsKey(scene))
+        CreateStreamsContextForScene(scene);
 
-      return _streamsHolders[scene];
+      return _streamsContexts[scene];
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Initialize() {
-      _disposeHandle = new StreamTokenSource();
+      _disposeHandle = new CancellationTokenSource();
     }
 
-    private static void CreateStreamsHolderForScene(Scene scene) {
-      var holder = new SceneStreamsHolder(scene, _disposeHandle.Token);
-      _streamsHolders.Add(scene, holder);
-      holder.OnDispose(() => _streamsHolders.Remove(scene));
+    private static void CreateStreamsContextForScene(Scene scene) {
+      var context = new SceneExecutionContext(scene, _disposeHandle.Token);
+      _streamsContexts.Add(scene, context);
+      context.OnDispose(() => _streamsContexts.Remove(scene));
     }
 
 #if UNITY_EDITOR
@@ -59,8 +60,8 @@ namespace Streams {
       if (state != PlayModeStateChange.ExitingPlayMode)
         return;
 
-      _disposeHandle.Release();
-      Assert.IsTrue(_streamsHolders.Count == 0, "Internal error - not all holders were released");
+      _disposeHandle.Cancel();
+      Assert.IsTrue(_streamsContexts.Count == 0, "Internal error - not all contexts were released");
     }
 #endif
 

@@ -1,6 +1,6 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using JetBrains.Annotations;
 using Streams.Exceptions;
 using Streams.Internal;
@@ -16,18 +16,18 @@ namespace Streams {
   /// <p> Base streams executed on the Player Loop Systems, and they can be obtained from <see cref="UnityPlayerLoop.GetStream{TSystem}"/> method.
   /// If you want to get the stream from scene, you can call <see cref="SceneStreams.GetStream{TBaseSystem}"/> </p>
   /// <code>
-  /// Streams.Get&lt;Update&gt;().Add(deltaTime => {
+  /// UnityPlayerLoop.Get&lt;Update&gt;().Add(self => {
   ///   // do something inside the base stream in the Update system
   /// });
   /// </code>
   /// <code>
-  /// SceneManager.GetActiveScene().GetStream&lt;FixedUpdate&gt;().Add(deltaTime => {
+  /// SceneManager.GetActiveScene().GetStream&lt;FixedUpdate&gt;().Add(self => {
   ///   // do something inside the active scene stream in the FixedUpdate system
   /// });
   /// </code>
   /// <code>
-  /// gameObject.scene.GetStream&lt;PreLateUpdate&gt;().Add(deltaTime => {
-  ///   // do something inside the game object scene stream in the PreLateUpdate system
+  /// gameObject.GetStream&lt;PreLateUpdate&gt;().Add(self => {
+  ///   // do something inside the game object stream in the PreLateUpdate system
   /// });
   /// </code>
   /// </summary>
@@ -54,6 +54,7 @@ namespace Streams {
 
     private readonly ActionsStorage _actionsStorage = new();
     private readonly ActionsStorage _parallelActionsStorage = new();
+    private readonly Queue<StreamTask> _yieldTasks = new();
 
     private readonly ParallelActionsWorker _worker = new();
     private readonly Action<float, int> _handleParallelAction;
@@ -74,25 +75,12 @@ namespace Streams {
     /// </summary>
     /// <param name="action"> The action to be performed </param>
     /// <param name="token"> Token for cancelling an action </param>
-    /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public PersistentStreamAction Add([NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
+    public PersistentAction Add([NotNull] Action<PersistentAction> action, CancellationToken token = default) {
       ValidateAddAction(action);
 
-      var streamAction = new PersistentStreamAction(action, token, priority);
-      _actionsStorage.Add(streamAction);
-      return streamAction;
-    }
-
-    public void Add([NotNull] IUpdatable updatable, StreamToken token = default, uint priority = uint.MaxValue) {
-      AddUpdatable(updatable, _actionsStorage, token, priority);
-    }
-
-    public CoroutineStreamAction Add([NotNull] Func<IEnumerator> action, StreamToken token = default, uint priority = uint.MaxValue) {
-      ValidateAddAction(action);
-
-      var streamAction = new CoroutineStreamAction(action, token, priority);
+      var streamAction = new PersistentAction(action, token);
       _actionsStorage.Add(streamAction);
       return streamAction;
     }
@@ -103,17 +91,15 @@ namespace Streams {
     /// <param name="condition"> The action will be performed when the condition is true </param>
     /// <param name="action"> The action to be performed </param>
     /// <param name="token"> Token for cancelling an action </param>
-    /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public ConditionalStreamAction Add(
-      [NotNull] Func<bool> condition, [NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue
-    ) {
+    public ConditionalAction Add(
+      [NotNull] Func<bool> condition, [NotNull] Action<ConditionalAction> action, CancellationToken token = default) {
       ValidateAddAction(action);
       if (condition == null)
         throw new ArgumentNullException(nameof(condition));
 
-      var streamAction = new ConditionalStreamAction(action, condition, token, priority);
+      var streamAction = new ConditionalAction(action, condition, token);
       _actionsStorage.Add(streamAction);
       return streamAction;
     }
@@ -124,13 +110,12 @@ namespace Streams {
     /// <param name="time"> The time after which the action will be completed </param>
     /// <param name="action"> The action to be performed </param>
     /// <param name="token"> Token for cancelling an action </param>
-    /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     /// <remarks> It is worth distinguishing a temporary action from a timer.
     /// A temporary action is executed every tick of the stream for a specified time,
     /// and a timer executes the action once after the time has elapsed. </remarks>
-    public TemporalStreamAction Add(float time, [NotNull] Action<float> action, StreamToken token = default, uint priority = uint.MaxValue) {
+    public TemporalAction Add(float time, [NotNull] Action<TemporalAction> action, CancellationToken token = default) {
       if (time <= 0) {
         Debug.LogWarning($"Time is negative or zero: {time}");
         return null;
@@ -138,42 +123,7 @@ namespace Streams {
 
       ValidateAddAction(action);
 
-      var streamAction = new TemporalStreamAction(action, time, token, priority);
-      _actionsStorage.Add(streamAction);
-      return streamAction;
-    }
-
-    /// <summary>
-    /// Adds a new action that will be executed in parallel
-    /// </summary>
-    /// <param name="action"> The action to be performed </param>
-    /// <param name="token"> Token for cancelling an action </param>
-    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
-    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public PersistentStreamAction AddParallel([NotNull] Action<float> action, StreamToken token = default) {
-      ValidateAddAction(action);
-
-      var streamAction = new PersistentStreamAction(action, token, uint.MaxValue);
-      _parallelActionsStorage.Add(streamAction);
-      return streamAction;
-    }
-
-    public void AddParallel([NotNull] IUpdatable updatable, StreamToken token = default) {
-      AddUpdatable(updatable, _parallelActionsStorage, token, uint.MaxValue);
-    }
-
-    /// <summary>
-    /// Adds an action for one-time execution
-    /// </summary>
-    /// <param name="action"> The action to be performed </param>
-    /// <param name="token"> Token for cancelling an action </param>
-    /// <param name="priority"> Priority of action execution. Actions with the same priority will be executed in the order they were created. Zero priority is the highest </param>
-    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
-    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public OnceStreamAction AddOnce([NotNull] Action action, StreamToken token = default, uint priority = uint.MaxValue) {
-      ValidateAddAction(action);
-
-      var streamAction = new OnceStreamAction(action, token, priority);
+      var streamAction = new TemporalAction(action, time, token);
       _actionsStorage.Add(streamAction);
       return streamAction;
     }
@@ -185,10 +135,55 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public AsyncStreamAction AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
+    public AsyncAction Add([NotNull] Func<AsyncAction, StreamTask> action, CancellationToken token = default) {
       ValidateAddAction(action);
 
-      var streamAction = new AsyncStreamAction(action, token);
+      var streamAction = new AsyncAction(action, token);
+      _actionsStorage.Add(streamAction);
+      return streamAction;
+    }
+
+    /// <summary>
+    /// Adds a new action that will be executed in parallel
+    /// </summary>
+    /// <param name="action"> The action to be performed </param>
+    /// <param name="token"> Token for cancelling an action </param>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
+    public PersistentAction AddParallel([NotNull] Action<PersistentAction> action, CancellationToken token = default) {
+      ValidateAddAction(action);
+
+      var streamAction = new PersistentAction(action, token);
+      _parallelActionsStorage.Add(streamAction);
+      return streamAction;
+    }
+
+    /// <summary>
+    /// Adds an action for one-time execution
+    /// </summary>
+    /// <param name="action"> The action to be performed </param>
+    /// <param name="token"> Token for cancelling an action </param>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
+    public OnceAction AddOnce([NotNull] Action action, CancellationToken token = default) {
+      ValidateAddAction(action);
+
+      var streamAction = new OnceAction(action, token);
+      _actionsStorage.Add(streamAction);
+      return streamAction;
+    }
+
+    /// <summary>
+    /// Adds an async action to be performed
+    /// </summary>
+    /// <param name="action"> The action to be performed </param>
+    /// <param name="token"> Token for cancelling an action </param>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
+    public AsyncOnceAction AddOnce([NotNull] Func<StreamTask> action, CancellationToken token = default) {
+      ValidateAddAction(action);
+
+      var streamAction = new AsyncOnceAction(action, token);
       _actionsStorage.Add(streamAction);
       return streamAction;
     }
@@ -204,7 +199,7 @@ namespace Streams {
     /// <remarks> It is worth distinguishing a timer from a temporary action.
     /// A temporary action is executed every tick of the stream for a specified time,
     /// and a timer executes the action once after the time has elapsed. </remarks>
-    public StreamTimer AddTimer(float time, [NotNull] Action onComplete, StreamToken token = default) {
+    public StreamTimer AddTimer(float time, [NotNull] Action onComplete, CancellationToken token = default) {
       if (time <= 0)
         throw new ArgumentOutOfRangeException(nameof(time), $"Time is negative or zero: {time}");
 
@@ -225,7 +220,7 @@ namespace Streams {
     /// </code>
     /// </exception>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
-    public void Lock(StreamToken lockToken) {
+    public void Lock(CancellationToken lockToken) {
       if (State == StreamState.Running)
         throw new InvalidOperationException("Cannot lock a stream inside its execution");
 
@@ -239,11 +234,11 @@ namespace Streams {
     /// </summary>
     /// <remarks> If the stream has already been disposed, the handler will be called immediately </remarks>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed handler is null </exception>
-    public void OnTerminate([NotNull] Action onTermination, StreamToken subscriptionToken = default) {
+    public void OnTerminate([NotNull] Action onTermination, CancellationToken subscriptionToken = default) {
       if (onTermination == null)
         throw new ArgumentNullException(nameof(onTermination));
 
-      if (subscriptionToken.Released)
+      if (subscriptionToken.IsCancellationRequested)
         return;
 
       if (State == StreamState.Terminated) {
@@ -269,6 +264,10 @@ namespace Streams {
     protected void ValidateStreamState() {
       if (State is StreamState.Terminating or StreamState.Terminated)
         throw new StreamDisposedException(ToString());
+    }
+
+    internal void ScheduleTaskCompletion(StreamTask task) {
+      _yieldTasks.Enqueue(task);
     }
 
     internal void Update(float deltaTime) {
@@ -305,19 +304,6 @@ namespace Streams {
       State = StreamState.Terminated;
     }
 
-    private void AddUpdatable([NotNull] IUpdatable updatable, ActionsStorage storage, StreamToken token, uint priority) {
-      if (updatable == null)
-        throw new ArgumentNullException(nameof(updatable));
-
-      var initAction = new OnceStreamAction(updatable.Initialize, token, priority);
-      var streamAction = new PersistentStreamAction(updatable.UpdateFunction, token, priority);
-      var shutdownAction = new OnceStreamAction(updatable.Shutdown, token, priority);
-
-      _actionsStorage.Add(initAction);
-      initAction.OnComplete(() => storage.Add(streamAction));
-      streamAction.OnCancel(() => _actionsStorage.Add(shutdownAction));
-    }
-
     private bool CanExecute() {
       return (_actionsStorage.Count != 0 || _parallelActionsStorage.Count != 0) && !Locked;
     }
@@ -344,6 +330,9 @@ namespace Streams {
       State = StreamState.Running;
       _streamsStack.Push(this);
       Profiler.BeginSample(_profilerName);
+
+      while (_yieldTasks.TryDequeue(out StreamTask task))
+        task.SetResult();
 
       _worker.Start(deltaTime, _parallelActionsStorage.Count, WorkStrategy, _handleParallelAction);
 

@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using NUnit.Framework;
-using Streams.StreamHolders;
+using Streams.StreamContexts;
 using UnityEngine.PlayerLoop;
 
 namespace Streams.Tests {
@@ -10,9 +10,9 @@ namespace Streams.Tests {
     [Test]
     public async Task MonoStreamRunnerTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var factory = new GameObjectStreamsHolderFactory();
-      GameObjectStreamsHolder holder = factory.Create();
-      holder.GetStream<Update>().AddOnce(() => tcs.SetResult(true));
+      var factory = new GameObjectStreamsContextFactory();
+      GameObjectExecutionContext context = factory.Create();
+      context.GetStream<Update>().AddOnce(() => tcs.SetResult(true));
       Assert.IsTrue(await tcs.Task);
     }
 
