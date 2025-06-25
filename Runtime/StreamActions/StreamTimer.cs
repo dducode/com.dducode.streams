@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using Streams.StreamActions.Components;
 
 namespace Streams.StreamActions {
@@ -12,12 +11,12 @@ namespace Streams.StreamActions {
     private readonly Completion _completion = new();
     private float _remainingTime;
 
-    internal StreamTimer(float time, Action action, CancellationToken cancellationToken) : base(cancellationToken) {
+    internal StreamTimer(float time, Action action, StreamToken cancellationToken) : base(cancellationToken) {
       _action = action;
       _remainingTime = time;
     }
 
-    public void OnComplete(Action onComplete, CancellationToken subscriptionToken = default) {
+    public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
       _completion.OnComplete(onComplete, subscriptionToken);
     }
 

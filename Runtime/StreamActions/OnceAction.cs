@@ -11,11 +11,11 @@ namespace Streams.StreamActions {
     private readonly Action _action;
     private readonly Completion _completion = new();
 
-    internal OnceAction(Action action, CancellationToken cancellationToken) : base(cancellationToken) {
+    internal OnceAction(Action action, StreamToken cancellationToken) : base(cancellationToken) {
       _action = action;
     }
 
-    public void OnComplete(Action onComplete, CancellationToken subscriptionToken = default) {
+    public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
       _completion.OnComplete(onComplete, subscriptionToken);
     }
 

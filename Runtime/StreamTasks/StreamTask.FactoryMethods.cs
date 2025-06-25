@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using JetBrains.Annotations;
 using Streams.StreamContexts;
 using Streams.StreamTasks.Internal;
@@ -9,59 +8,73 @@ namespace Streams.StreamTasks {
 
   public partial class StreamTask {
 
-    public static StreamTask Yield() {
-      var task = new StreamTask();
-      StreamTaskHelper.GetRunningStream().AddOnce(task.SetResult);
-      return task;
+    public static StreamYieldAwaitable Yield() {
+      var yield = new StreamYieldAwaitable();
+      yield.SetStream(StreamTaskHelper.GetRunningStream());
+      return yield;
     }
 
-    public static StreamTask ContinueOnStream<TSystemType>() {
-      var task = new StreamTask();
-      Contexts.All.GetValueOrDefault(StreamTaskHelper.GetRunningStream()).GetStream<TSystemType>().AddOnce(task.SetResult);
-      return task;
+    public static StreamYieldAwaitable ContinueOnStream<TSystemType>() {
+      var yield = new StreamYieldAwaitable();
+      yield.SetStream(ExecutionContexts.All.GetValueOrDefault(StreamTaskHelper.GetRunningStream()).GetStream<TSystemType>());
+      return yield;
     }
 
     public static StreamTask Delay(int milliseconds) {
-      return Delay(milliseconds, CancellationToken.None);
+      return Delay(milliseconds, StreamToken.None);
     }
 
-    public static StreamTask Delay(int milliseconds, CancellationToken cancellationToken) {
-      switch (milliseconds) {
-        case < 0:
-          throw new ArgumentOutOfRangeException(nameof(milliseconds));
-        case 0:
-          return CompletedTask;
-      }
+    public static StreamTask Delay(int milliseconds, StreamToken cancellationToken) {
+      if (milliseconds < 0)
+        throw new ArgumentOutOfRangeException(nameof(milliseconds));
+      if (cancellationToken.Released)
+        return FromCanceled();
+      if (milliseconds == 0)
+        return CompletedTask;
 
       var task = new StreamTask();
       StreamTaskHelper.GetRunningStream().AddTimer(milliseconds / 1000f, task.SetResult, cancellationToken);
-      cancellationToken.Register(task.SetCanceled);
+      cancellationToken.RegisterTask(task);
+      return task;
+    }
+
+    public static StreamTask<TResult> FromResult<TResult>(TResult result) {
+      var task = new StreamTask<TResult>();
+      task.SetResult(result);
+      return task;
+    }
+
+    public static StreamTask FromCanceled() {
+      var task = new StreamTask();
+      task.SetCanceled();
       return task;
     }
 
     public static StreamTask WaitWhile([NotNull] Func<bool> condition) {
-      return WaitWhile(condition, CancellationToken.None);
+      return WaitWhile(condition, StreamToken.None);
     }
 
-    public static StreamTask WaitWhile([NotNull] Func<bool> condition, CancellationToken cancellationToken) {
+    public static StreamTask WaitWhile([NotNull] Func<bool> condition, StreamToken cancellationToken) {
       if (condition == null)
         throw new ArgumentNullException(nameof(condition));
+      if (cancellationToken.Released)
+        return FromCanceled();
       if (!condition())
         return CompletedTask;
 
       var task = new StreamTask();
-      var cts = new CancellationTokenSource();
+      var cts = new StreamTokenSource();
       StreamTaskHelper.GetRunningStream().Add(_ => {
         if (condition())
           return;
 
         task.SetResult();
-        cts.Cancel();
+        cts.Release();
       }, cts.Token);
 
       cancellationToken.Register(() => {
         task.SetCanceled();
-        cts.Cancel();
+        cts.Release();
       });
       return task;
     }
@@ -80,8 +93,7 @@ namespace Streams.StreamTasks {
       int tasksCount = tasks.Count;
       var completedTasks = 0;
       var increment = new Action(() => {
-        ++completedTasks;
-        if (completedTasks == tasksCount)
+        if (++completedTasks == tasksCount)
           task.SetResult();
       });
 

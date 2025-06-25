@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using Streams.Extensions;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
@@ -13,7 +12,7 @@ namespace Streams.StreamContexts {
 
     private readonly Dictionary<Type, ManagedExecutionStream> _streams = new();
 
-    private CancellationTokenSource _lockHandle;
+    private StreamTokenSource _lockHandle;
 
     private bool _initialized;
     private Transform _transform;
@@ -53,12 +52,12 @@ namespace Streams.StreamContexts {
     }
 
     private void OnEnable() {
-      _lockHandle?.Cancel();
+      _lockHandle?.Release();
       _lockHandle = null;
     }
 
     private void OnDisable() {
-      _lockHandle = new CancellationTokenSource();
+      _lockHandle = new StreamTokenSource();
       foreach (ManagedExecutionStream stream in _streams.Values)
         stream.Lock(_lockHandle.Token);
     }

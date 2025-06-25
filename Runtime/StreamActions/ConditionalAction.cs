@@ -18,7 +18,7 @@ namespace Streams.StreamActions {
     internal ConditionalAction(
       Action<ConditionalAction> action,
       Func<bool> condition,
-      CancellationToken cancellationToken) : base(action, cancellationToken) {
+      StreamToken cancellationToken) : base(action, cancellationToken) {
       _condition = condition;
     }
 

@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using JetBrains.Annotations;
 
 namespace Streams.StreamActions {
@@ -37,17 +36,17 @@ namespace Streams.StreamActions {
     private bool _canceled;
     private uint _priority;
 
-    private protected StreamAction(CancellationToken cancellationToken) {
+    private protected StreamAction(StreamToken cancellationToken) {
       cancellationToken.Register(() => _canceled = true);
       _priority = uint.MaxValue;
       _name = GetType().Name;
     }
 
-    public void OnCancel([NotNull] Action onCancel, CancellationToken subscriptionToken = default) {
+    public void OnCancel([NotNull] Action onCancel, StreamToken subscriptionToken = default) {
       if (onCancel == null)
         throw new ArgumentNullException(nameof(onCancel));
 
-      if (subscriptionToken.IsCancellationRequested)
+      if (subscriptionToken.Released)
         return;
 
       if (_canceled) {

@@ -6,7 +6,7 @@ namespace Streams.StreamActions {
 
   public interface ICompletable {
 
-    public void OnComplete([NotNull] Action onComplete, CancellationToken subscriptionToken = default);
+    public void OnComplete([NotNull] Action onComplete, StreamToken subscriptionToken = default);
 
   }
 

@@ -88,7 +88,7 @@ namespace Streams {
     private uint _priority = uint.MaxValue;
     private float? _delta;
     private uint _tickRate = 1;
-    private CancellationTokenSource _subscriptionHandle;
+    private StreamTokenSource _subscriptionHandle;
     private ExecutionStream _baseStream;
     private PersistentAction _execution;
 
@@ -96,7 +96,7 @@ namespace Streams {
       ExecutionStream baseStream,
       string name = nameof(ManagedExecutionStream)
     ) : base(name) {
-      _subscriptionHandle = new CancellationTokenSource();
+      _subscriptionHandle = new StreamTokenSource();
       _baseStream = baseStream;
       _execution = _baseStream.Add(self => Update(self.DeltaTime), _subscriptionHandle.Token);
       _execution.Priority = _priority;
@@ -132,8 +132,8 @@ namespace Streams {
     /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     public void Reconnect(ExecutionStream stream, uint? priority = null) {
       ValidateStreamState();
-      _subscriptionHandle?.Cancel();
-      _subscriptionHandle = new CancellationTokenSource();
+      _subscriptionHandle?.Release();
+      _subscriptionHandle = new StreamTokenSource();
 
       _baseStream = stream;
       _execution = _baseStream.Add(self => Update(self.DeltaTime), _subscriptionHandle.Token).SetTickRate(_tickRate);
@@ -159,7 +159,7 @@ namespace Streams {
       if (State is StreamState.Terminating or StreamState.Terminated)
         return;
 
-      _subscriptionHandle.Cancel();
+      _subscriptionHandle.Release();
       _subscriptionHandle = null;
       _execution = null;
       Terminate();

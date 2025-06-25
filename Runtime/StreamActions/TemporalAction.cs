@@ -16,7 +16,7 @@ namespace Streams.StreamActions {
     private ulong _ticks;
     private float _accumulatedDeltaTime;
 
-    internal TemporalAction(Action<TemporalAction> action, float time, CancellationToken cancellationToken) : base(action, cancellationToken) {
+    internal TemporalAction(Action<TemporalAction> action, float time, StreamToken cancellationToken) : base(action, cancellationToken) {
       _remainingTime = time;
     }
 
@@ -38,7 +38,7 @@ namespace Streams.StreamActions {
       return this;
     }
 
-    public void OnComplete(Action onComplete, CancellationToken subscriptionToken = default) {
+    public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
       _completion.OnComplete(onComplete, subscriptionToken);
     }
 

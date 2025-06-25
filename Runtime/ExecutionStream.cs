@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using JetBrains.Annotations;
 using Streams.Exceptions;
 using Streams.Internal;
@@ -54,7 +53,8 @@ namespace Streams {
 
     private readonly ActionsStorage _actionsStorage = new();
     private readonly ActionsStorage _parallelActionsStorage = new();
-    private readonly Queue<StreamTask> _yieldTasks = new();
+    private readonly Queue<StreamTask> _waitedTasks = new();
+    private readonly Queue<Action> _continuations = new();
 
     private readonly ParallelActionsWorker _worker = new();
     private readonly Action<float, int> _handleParallelAction;
@@ -77,7 +77,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public PersistentAction Add([NotNull] Action<PersistentAction> action, CancellationToken token = default) {
+    public PersistentAction Add([NotNull] Action<PersistentAction> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new PersistentAction(action, token);
@@ -94,7 +94,7 @@ namespace Streams {
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     public ConditionalAction Add(
-      [NotNull] Func<bool> condition, [NotNull] Action<ConditionalAction> action, CancellationToken token = default) {
+      [NotNull] Func<bool> condition, [NotNull] Action<ConditionalAction> action, StreamToken token = default) {
       ValidateAddAction(action);
       if (condition == null)
         throw new ArgumentNullException(nameof(condition));
@@ -115,7 +115,7 @@ namespace Streams {
     /// <remarks> It is worth distinguishing a temporary action from a timer.
     /// A temporary action is executed every tick of the stream for a specified time,
     /// and a timer executes the action once after the time has elapsed. </remarks>
-    public TemporalAction Add(float time, [NotNull] Action<TemporalAction> action, CancellationToken token = default) {
+    public TemporalAction Add(float time, [NotNull] Action<TemporalAction> action, StreamToken token = default) {
       if (time <= 0) {
         Debug.LogWarning($"Time is negative or zero: {time}");
         return null;
@@ -135,7 +135,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public AsyncAction Add([NotNull] Func<AsyncAction, StreamTask> action, CancellationToken token = default) {
+    public AsyncAction Add([NotNull] Func<AsyncAction, StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new AsyncAction(action, token);
@@ -150,7 +150,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public PersistentAction AddParallel([NotNull] Action<PersistentAction> action, CancellationToken token = default) {
+    public PersistentAction AddParallel([NotNull] Action<PersistentAction> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new PersistentAction(action, token);
@@ -165,7 +165,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public OnceAction AddOnce([NotNull] Action action, CancellationToken token = default) {
+    public OnceAction AddOnce([NotNull] Action action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new OnceAction(action, token);
@@ -180,7 +180,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public AsyncOnceAction AddOnce([NotNull] Func<StreamTask> action, CancellationToken token = default) {
+    public AsyncOnceAction AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new AsyncOnceAction(action, token);
@@ -199,7 +199,7 @@ namespace Streams {
     /// <remarks> It is worth distinguishing a timer from a temporary action.
     /// A temporary action is executed every tick of the stream for a specified time,
     /// and a timer executes the action once after the time has elapsed. </remarks>
-    public StreamTimer AddTimer(float time, [NotNull] Action onComplete, CancellationToken token = default) {
+    public StreamTimer AddTimer(float time, [NotNull] Action onComplete, StreamToken token = default) {
       if (time <= 0)
         throw new ArgumentOutOfRangeException(nameof(time), $"Time is negative or zero: {time}");
 
@@ -220,7 +220,7 @@ namespace Streams {
     /// </code>
     /// </exception>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
-    public void Lock(CancellationToken lockToken) {
+    public void Lock(StreamToken lockToken) {
       if (State == StreamState.Running)
         throw new InvalidOperationException("Cannot lock a stream inside its execution");
 
@@ -234,11 +234,11 @@ namespace Streams {
     /// </summary>
     /// <remarks> If the stream has already been disposed, the handler will be called immediately </remarks>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed handler is null </exception>
-    public void OnTerminate([NotNull] Action onTermination, CancellationToken subscriptionToken = default) {
+    public void OnTerminate([NotNull] Action onTermination, StreamToken subscriptionToken = default) {
       if (onTermination == null)
         throw new ArgumentNullException(nameof(onTermination));
 
-      if (subscriptionToken.IsCancellationRequested)
+      if (subscriptionToken.Released)
         return;
 
       if (State == StreamState.Terminated) {
@@ -266,8 +266,12 @@ namespace Streams {
         throw new StreamDisposedException(ToString());
     }
 
+    internal void ScheduleContinuation(Action continuation) {
+      _continuations.Enqueue(continuation);
+    }
+
     internal void ScheduleTaskCompletion(StreamTask task) {
-      _yieldTasks.Enqueue(task);
+      _waitedTasks.Enqueue(task);
     }
 
     internal void Update(float deltaTime) {
@@ -305,7 +309,7 @@ namespace Streams {
     }
 
     private bool CanExecute() {
-      return (_actionsStorage.Count != 0 || _parallelActionsStorage.Count != 0) && !Locked;
+      return (_actionsStorage.Count != 0 || _parallelActionsStorage.Count != 0 || _waitedTasks.Count != 0 || _continuations.Count != 0) && !Locked;
     }
 
     private void ValidateExecution() {
@@ -331,8 +335,11 @@ namespace Streams {
       _streamsStack.Push(this);
       Profiler.BeginSample(_profilerName);
 
-      while (_yieldTasks.TryDequeue(out StreamTask task))
+      while (_waitedTasks.TryDequeue(out StreamTask task))
         task.SetResult();
+
+      while (_continuations.TryDequeue(out Action continuation))
+        continuation();
 
       _worker.Start(deltaTime, _parallelActionsStorage.Count, WorkStrategy, _handleParallelAction);
 

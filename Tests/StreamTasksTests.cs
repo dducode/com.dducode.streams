@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using Streams.Exceptions;
+using Streams.Extensions;
 using Streams.StreamTasks;
-using Streams.StreamTasks.Extensions;
 using Streams.Tests.Attributes;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
@@ -166,12 +165,12 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task ImmediateCancellationTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var sts = new CancellationTokenSource();
+      var sts = new StreamTokenSource();
       SetFailureAfterTime(2, tcs);
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         try {
-          sts.Cancel();
+          sts.Release();
           await StreamTask.Delay(1000, sts.Token);
           tcs.SetResult(false);
         }
@@ -186,7 +185,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task DelayedCancellationTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var sts = new CancellationTokenSource();
+      var sts = new StreamTokenSource();
       SetFailureAfterTime(2, tcs);
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
@@ -198,7 +197,7 @@ namespace Streams.Tests {
           tcs.SetResult(true);
         }
       });
-      UnityPlayerLoop.GetStream<Update>().AddTimer(0.5f, () => sts.Cancel());
+      UnityPlayerLoop.GetStream<Update>().AddTimer(0.5f, () => sts.Release());
 
       Assert.IsTrue(await tcs.Task);
     }

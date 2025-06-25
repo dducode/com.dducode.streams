@@ -1,0 +1,18 @@
+{
+    "name": "dducode.Streams.Addressables",
+    "rootNamespace": "Streams.Addressables",
+    "references": [
+        "GUID:c7b9315b3bb06e74cb9eeda4676457f5",
+        "GUID:84651a3751eca9349aac36a66bba901b",
+        "GUID:9e24947de15b9834991c9d8411ea37cf"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

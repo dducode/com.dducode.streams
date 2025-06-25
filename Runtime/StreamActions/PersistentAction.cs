@@ -14,7 +14,7 @@ namespace Streams.StreamActions {
     private ulong _ticks;
     private float _accumulatedDeltaTime;
 
-    internal PersistentAction(Action<PersistentAction> action, CancellationToken cancellationToken) : base(action, cancellationToken) {
+    internal PersistentAction(Action<PersistentAction> action, StreamToken cancellationToken) : base(action, cancellationToken) {
     }
 
     public PersistentAction SetDelta(float value) {

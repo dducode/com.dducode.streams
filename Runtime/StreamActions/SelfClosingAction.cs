@@ -9,7 +9,7 @@ namespace Streams.StreamActions {
     private protected override Delegate Action => _action;
     private readonly Action<TAction> _action;
 
-    protected SelfClosingAction(Action<TAction> action, CancellationToken cancellationToken) : base(cancellationToken) {
+    protected SelfClosingAction(Action<TAction> action, StreamToken cancellationToken) : base(cancellationToken) {
       _action = action;
     }
 
@@ -26,7 +26,7 @@ namespace Streams.StreamActions {
     private protected override Delegate Action => _func;
     private readonly Func<TAction, TReturn> _func;
 
-    protected SelfClosingAction(Func<TAction, TReturn> func, CancellationToken cancellationToken) : base(cancellationToken) {
+    protected SelfClosingAction(Func<TAction, TReturn> func, StreamToken cancellationToken) : base(cancellationToken) {
       _func = func;
     }
 
