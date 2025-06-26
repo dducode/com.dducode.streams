@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using Streams.StreamContexts;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
@@ -13,11 +12,11 @@ namespace Streams {
   public static class UnityPlayerLoop {
 
     private static IStreamExecutionContext _runtimeContext;
-    private static CancellationTokenSource _runtimeCancellation = new();
+    private static StreamTokenSource _runtimeCancellation = new();
 
 #if UNITY_EDITOR
     private static IStreamExecutionContext _editorContext;
-    private static CancellationTokenSource _editorCancellation = new();
+    private static StreamTokenSource _editorCancellation = new();
 
     static UnityPlayerLoop() {
       EditorApplication.playModeStateChanged += state => {
@@ -49,10 +48,10 @@ namespace Streams {
 #if UNITY_EDITOR
     [InitializeOnLoadMethod]
     private static void EditorInitialize() {
-      _runtimeCancellation?.Cancel();
+      _runtimeCancellation?.Release();
       _runtimeCancellation = null;
 
-      _editorCancellation = new CancellationTokenSource();
+      _editorCancellation = new StreamTokenSource();
       _editorContext = new GlobalExecutionContext(_editorCancellation.Token);
     }
 #endif
@@ -60,10 +59,10 @@ namespace Streams {
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void RuntimeInitialize() {
 #if UNITY_EDITOR
-      _editorCancellation.Cancel();
+      _editorCancellation.Release();
       _editorCancellation = null;
 #endif
-      _runtimeCancellation = new CancellationTokenSource();
+      _runtimeCancellation = new StreamTokenSource();
       _runtimeContext = new GlobalExecutionContext(_runtimeCancellation.Token);
     }
 

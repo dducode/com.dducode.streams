@@ -1,18 +1,16 @@
 using System;
-using System.Runtime.CompilerServices;
-using Streams.StreamTasks;
+using Streams.StreamTasks.Internal;
 
 namespace Streams.StreamActions {
 
-  public class AsyncAction : SelfClosingAction<AsyncAction, StreamTask> {
+  public class AsyncAction : SelfClosingAction<AsyncAction, RestartableStreamTask> {
 
     public override float DeltaTime => _deltaTime;
 
-    private StreamTask _task;
-    private IAsyncStateMachine _stateMachine;
+    private RestartableStreamTask _task;
     private float _deltaTime;
 
-    internal AsyncAction(Func<AsyncAction, StreamTask> action, StreamToken cancellationToken) : base(action, cancellationToken) {
+    internal AsyncAction(Func<AsyncAction, RestartableStreamTask> action, StreamToken cancellationToken) : base(action, cancellationToken) {
     }
 
     internal override void Invoke(float deltaTime) {
@@ -23,7 +21,6 @@ namespace Streams.StreamActions {
 
       _deltaTime = deltaTime;
       _task ??= InvokeAction();
-      _stateMachine ??= _task.GetStateMachine();
 
       if (!_task.IsCompleted)
         return;
@@ -31,8 +28,7 @@ namespace Streams.StreamActions {
       if (_task.Error != null)
         throw _task.Error;
 
-      _task.Reset();
-      _stateMachine.MoveNext();
+      _task.Restart();
     }
 
   }

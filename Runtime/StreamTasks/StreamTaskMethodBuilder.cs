@@ -10,6 +10,7 @@ namespace Streams.StreamTasks {
 
     public StreamTask Task { get; private set; }
     internal IAsyncStateMachineRunner StateMachineRunner { get; private set; }
+    private Action _stateMachineMoveNext;
 
     public static StreamTaskMethodBuilder Create() {
       return new StreamTaskMethodBuilder();
@@ -17,8 +18,6 @@ namespace Streams.StreamTasks {
 
     public void Start<TStateMachine>(ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine {
       stateMachine.MoveNext();
-      Task ??= new StreamTask();
-      Task.SetStateMachine(stateMachine);
     }
 
     public void SetStateMachine(IAsyncStateMachine stateMachine) {
@@ -37,14 +36,16 @@ namespace Streams.StreamTasks {
       where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine {
       Task ??= new StreamTask();
       StateMachineRunner ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine);
-      awaiter.OnCompleted(StateMachineRunner.Run);
+      _stateMachineMoveNext ??= StateMachineRunner.Run;
+      awaiter.OnCompleted(_stateMachineMoveNext);
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine {
       Task ??= new StreamTask();
       StateMachineRunner ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine);
-      awaiter.UnsafeOnCompleted(StateMachineRunner.Run);
+      _stateMachineMoveNext ??= StateMachineRunner.Run;
+      awaiter.UnsafeOnCompleted(_stateMachineMoveNext);
     }
 
     public void SetException(Exception exception) {
@@ -60,6 +61,8 @@ namespace Streams.StreamTasks {
   public struct StreamTaskMethodBuilder<TResult> {
 
     public StreamTask<TResult> Task { get; private set; }
+    internal IAsyncStateMachineRunner StateMachineRunner { get; private set; }
+    private Action _stateMachineMoveNext;
 
     public static StreamTaskMethodBuilder<TResult> Create() {
       return new StreamTaskMethodBuilder<TResult>();
@@ -84,13 +87,17 @@ namespace Streams.StreamTasks {
     public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine {
       Task ??= new StreamTask<TResult>();
-      awaiter.OnCompleted(stateMachine.MoveNext);
+      StateMachineRunner ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine);
+      _stateMachineMoveNext ??= StateMachineRunner.Run;
+      awaiter.OnCompleted(_stateMachineMoveNext);
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine {
       Task ??= new StreamTask<TResult>();
-      awaiter.UnsafeOnCompleted(stateMachine.MoveNext);
+      StateMachineRunner ??= new AsyncStateMachineRunner<TStateMachine>(stateMachine);
+      _stateMachineMoveNext ??= StateMachineRunner.Run;
+      awaiter.UnsafeOnCompleted(_stateMachineMoveNext);
     }
 
     public void SetException(Exception exception) {

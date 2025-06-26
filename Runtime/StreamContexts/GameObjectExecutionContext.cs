@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 namespace Streams.StreamContexts {
 
   [DisallowMultipleComponent]
-  public class GameObjectExecutionContext : MonoBehaviour, IStreamExecutionContext {
+  internal sealed class GameObjectExecutionContext : MonoBehaviour, IStreamExecutionContext {
 
     private readonly Dictionary<Type, ManagedExecutionStream> _streams = new();
 

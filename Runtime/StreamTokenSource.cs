@@ -11,7 +11,7 @@ namespace Streams {
     public bool Released { get; private set; }
 
     private readonly Queue<Action> _onReleaseActions = new();
-    private readonly Queue<StreamTask> _cancellableTasks = new();
+    private readonly Queue<ITask> _cancellableTasks = new();
 
     public StreamTokenSource() {
       Token = new StreamToken(this);
@@ -25,7 +25,7 @@ namespace Streams {
       while (_onReleaseActions.TryDequeue(out Action action))
         action();
 
-      while (_cancellableTasks.TryDequeue(out StreamTask task))
+      while (_cancellableTasks.TryDequeue(out ITask task))
         if (!task.IsCompleted)
           task.SetCanceled();
     }
@@ -42,7 +42,7 @@ namespace Streams {
       _onReleaseActions.Enqueue(onReleaseAction);
     }
 
-    internal void RegisterTask(StreamTask task) {
+    internal void Register(ITask task) {
       if (task == null)
         throw new ArgumentNullException(nameof(task));
 

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using UnityEngine.SceneManagement;
 
 namespace Streams.StreamContexts {
@@ -9,11 +8,11 @@ namespace Streams.StreamContexts {
 
     private readonly Scene _scene;
     private readonly Dictionary<Type, ManagedExecutionStream> _streams = new();
-    private readonly CancellationTokenSource _disposeHandle = new();
+    private readonly StreamTokenSource _disposeHandle = new();
 
-    public SceneExecutionContext(Scene scene, CancellationToken disposeToken) {
+    public SceneExecutionContext(Scene scene, StreamToken disposeToken) {
       _scene = scene;
-      disposeToken.Register(_disposeHandle.Cancel);
+      disposeToken.Register(_disposeHandle.Release);
       _disposeHandle.Token.Register(Dispose);
       SceneManager.activeSceneChanged += OnActiveSceneChanged;
       SceneManager.sceneUnloaded += OnSceneUnloaded;
@@ -48,7 +47,7 @@ namespace Streams.StreamContexts {
 
     private void OnSceneUnloaded(Scene unloadedScene) {
       if (_scene == unloadedScene)
-        _disposeHandle.Cancel();
+        _disposeHandle.Release();
     }
 
     private void Dispose() {

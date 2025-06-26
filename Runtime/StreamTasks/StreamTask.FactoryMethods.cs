@@ -34,7 +34,7 @@ namespace Streams.StreamTasks {
 
       var task = new StreamTask();
       StreamTaskHelper.GetRunningStream().AddTimer(milliseconds / 1000f, task.SetResult, cancellationToken);
-      cancellationToken.RegisterTask(task);
+      cancellationToken.Register(task);
       return task;
     }
 

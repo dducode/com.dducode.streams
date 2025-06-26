@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using JetBrains.Annotations;
 
 namespace Streams.StreamTasks {
 
   [AsyncMethodBuilder(typeof(StreamTaskMethodBuilder))]
-  public partial class StreamTask {
+  public partial class StreamTask : ITask {
 
     public static StreamTask CompletedTask { get; } = new() { IsCompleted = true };
     public bool IsCompleted { get; private set; }
@@ -16,7 +15,6 @@ namespace Streams.StreamTasks {
 
     private readonly Queue<(StreamTask nextTask, Action continuation)> _continuations = new(5);
     private readonly Queue<(StreamTask nextTask, Func<StreamTask> asyncContinuation)> _asyncContinuations = new(5);
-    private IAsyncStateMachine _stateMachine;
 
     internal StreamTask() {
     }
@@ -53,17 +51,9 @@ namespace Streams.StreamTasks {
       return nextTask;
     }
 
-    public StreamTask WithCancellation(CancellationToken token) {
-      token.Register(SetCanceled);
+    public StreamTask WithCancellation(StreamToken token) {
+      token.Register(this);
       return this;
-    }
-
-    internal void SetStateMachine(IAsyncStateMachine stateMachine) {
-      _stateMachine = stateMachine;
-    }
-
-    internal IAsyncStateMachine GetStateMachine() {
-      return _stateMachine;
     }
 
     internal void SetResult() {
@@ -71,6 +61,10 @@ namespace Streams.StreamTasks {
     }
 
     internal void SetCanceled() {
+      ((ITask)this).SetCanceled();
+    }
+
+    void ITask.SetCanceled() {
       Complete(new OperationCanceledException());
     }
 
@@ -78,11 +72,6 @@ namespace Streams.StreamTasks {
       if (exception == null)
         throw new ArgumentNullException(nameof(exception));
       Complete(exception);
-    }
-
-    internal void Reset() {
-      IsCompleted = false;
-      Error = null;
     }
 
     private void Complete(Exception error = null) {
@@ -115,7 +104,7 @@ namespace Streams.StreamTasks {
   }
 
   [AsyncMethodBuilder(typeof(StreamTaskMethodBuilder<>))]
-  public class StreamTask<TResult> {
+  public class StreamTask<TResult> : ITask {
 
     public bool IsCompleted { get; private set; }
     [CanBeNull] internal Exception Error { get; private set; }
@@ -159,8 +148,8 @@ namespace Streams.StreamTasks {
       return nextTask;
     }
 
-    public StreamTask<TResult> WithCancellation(CancellationToken token) {
-      token.Register(SetCanceled);
+    public StreamTask<TResult> WithCancellation(StreamToken token) {
+      token.Register(this);
       return this;
     }
 
@@ -168,7 +157,7 @@ namespace Streams.StreamTasks {
       Complete(result);
     }
 
-    internal void SetCanceled() {
+    void ITask.SetCanceled() {
       Complete(default, new OperationCanceledException());
     }
 

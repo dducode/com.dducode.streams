@@ -13,7 +13,7 @@ namespace Streams {
   public static class SceneStreams {
 
     private static readonly Dictionary<Scene, IStreamExecutionContext> _streamsContexts = new();
-    private static CancellationTokenSource _disposeHandle;
+    private static StreamTokenSource _disposeHandle;
 
 #if UNITY_EDITOR
     static SceneStreams() {
@@ -46,7 +46,7 @@ namespace Streams {
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Initialize() {
-      _disposeHandle = new CancellationTokenSource();
+      _disposeHandle = new StreamTokenSource();
     }
 
     private static void CreateStreamsContextForScene(Scene scene) {
@@ -60,7 +60,7 @@ namespace Streams {
       if (state != PlayModeStateChange.ExitingPlayMode)
         return;
 
-      _disposeHandle.Cancel();
+      _disposeHandle.Release();
       Assert.IsTrue(_streamsContexts.Count == 0, "Internal error - not all contexts were released");
     }
 #endif

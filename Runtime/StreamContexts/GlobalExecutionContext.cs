@@ -1,21 +1,19 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using Streams.Internal;
-using Streams.StreamContexts;
 using UnityEngine.LowLevel;
 using UnityEngine.PlayerLoop;
 
-namespace Streams {
+namespace Streams.StreamContexts {
 
-  public class GlobalExecutionContext : IStreamExecutionContext {
+  internal sealed class GlobalExecutionContext : IStreamExecutionContext {
 
     private readonly Dictionary<Type, ExecutionStream> _connectedStreams = new();
     private readonly RegisteredSystem _systemsTree = new(null, null);
-    private readonly CancellationTokenSource _streamsCancellation = new();
+    private readonly StreamTokenSource _streamsCancellation = new();
 
-    internal GlobalExecutionContext(CancellationToken disposeToken) {
-      disposeToken.Register(_streamsCancellation.Cancel);
+    internal GlobalExecutionContext(StreamToken disposeToken) {
+      disposeToken.Register(_streamsCancellation.Release);
       _streamsCancellation.Token.Register(() => {
         _connectedStreams.Clear();
         UnregisterSystems();

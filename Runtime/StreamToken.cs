@@ -28,14 +28,14 @@ namespace Streams {
       _source?.Register(action);
     }
 
-    internal void RegisterTask(StreamTask task) {
+    internal void Register(ITask task) {
       if (Released) {
         if (!task.IsCompleted)
           task.SetCanceled();
         return;
       }
 
-      _source?.RegisterTask(task);
+      _source?.Register(task);
     }
 
     public static implicit operator StreamToken(CancellationToken cancellationToken) {

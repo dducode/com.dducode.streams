@@ -5,6 +5,7 @@ using Streams.Exceptions;
 using Streams.Internal;
 using Streams.StreamActions;
 using Streams.StreamTasks;
+using Streams.StreamTasks.Internal;
 using UnityEngine.Profiling;
 using Debug = UnityEngine.Debug;
 
@@ -135,7 +136,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public AsyncAction Add([NotNull] Func<AsyncAction, StreamTask> action, StreamToken token = default) {
+    public AsyncAction Add([NotNull] Func<AsyncAction, RestartableStreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new AsyncAction(action, token);
