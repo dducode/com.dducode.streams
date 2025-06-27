@@ -5,8 +5,8 @@ namespace Streams.Extensions {
 
   public static class TimeSpanExtensions {
 
-    public static StreamTaskAwaiter GetAwaiter(this TimeSpan timeSpan) {
-      return StreamTask.Delay((int)timeSpan.TotalSeconds).GetAwaiter();
+    public static StreamDelayAwaitable GetAwaiter(this TimeSpan timeSpan) {
+      return StreamTask.WaitFor((int)timeSpan.TotalMilliseconds);
     }
 
   }

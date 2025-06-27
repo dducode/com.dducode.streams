@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Streams.Extensions;
+using Streams.Internal;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 using UnityEngine.SceneManagement;
@@ -63,7 +64,8 @@ namespace Streams.StreamContexts {
     }
 
     private ExecutionStream CreateStream(Type systemType) {
-      var stream = new ManagedExecutionStream(GetBaseStream(systemType), $"{_gameObject.name}_{systemType.Name}") {
+      var streamName = $"{_gameObject.name}_{NamesUtility.CreateProfilerSampleName(systemType)}";
+      var stream = new ManagedExecutionStream(GetBaseStream(systemType), streamName) {
         Priority = (uint)_siblingIndex
       };
       destroyCancellationToken.Register(stream.Dispose);

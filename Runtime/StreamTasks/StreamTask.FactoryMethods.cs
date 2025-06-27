@@ -9,15 +9,19 @@ namespace Streams.StreamTasks {
   public partial class StreamTask {
 
     public static StreamYieldAwaitable Yield() {
-      var yield = new StreamYieldAwaitable();
-      yield.SetStream(StreamTaskHelper.GetRunningStream());
-      return yield;
+      return new StreamYieldAwaitable(StreamTaskHelper.GetRunningStream());
     }
 
     public static StreamYieldAwaitable ContinueOnStream<TSystemType>() {
-      var yield = new StreamYieldAwaitable();
-      yield.SetStream(ExecutionContexts.All.GetValueOrDefault(StreamTaskHelper.GetRunningStream()).GetStream<TSystemType>());
-      return yield;
+      return new StreamYieldAwaitable(ExecutionContexts.All.GetValueOrDefault(StreamTaskHelper.GetRunningStream()).GetStream<TSystemType>());
+    }
+
+    public static StreamDelayAwaitable WaitFor(int milliseconds) {
+      return milliseconds switch {
+        < 0 => throw new ArgumentOutOfRangeException(nameof(milliseconds)),
+        0 => StreamDelayAwaitable.ZeroDelay,
+        _ => new StreamDelayAwaitable(StreamTaskHelper.GetRunningStream(), milliseconds)
+      };
     }
 
     public static StreamTask Delay(int milliseconds) {
@@ -33,7 +37,7 @@ namespace Streams.StreamTasks {
         return CompletedTask;
 
       var task = new StreamTask();
-      StreamTaskHelper.GetRunningStream().AddTimer(milliseconds / 1000f, task.SetResult, cancellationToken);
+      StreamTaskHelper.GetRunningStream().ScheduleDelayTaskCompletion(milliseconds / 1000f, task);
       cancellationToken.Register(task);
       return task;
     }

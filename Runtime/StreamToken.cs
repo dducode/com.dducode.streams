@@ -7,7 +7,7 @@ namespace Streams {
 
   public readonly struct StreamToken {
 
-    public static StreamToken None { get; } = new();
+    public static StreamToken None => default;
     public bool Released => _source?.Released ?? false;
 
     private readonly StreamTokenSource _source;

@@ -3,10 +3,14 @@ using System.Runtime.CompilerServices;
 
 namespace Streams.StreamTasks {
 
-  public struct StreamYieldAwaitable : ICriticalNotifyCompletion {
+  public readonly struct StreamYieldAwaitable : ICriticalNotifyCompletion {
 
     public bool IsCompleted => false;
-    private ExecutionStream _stream;
+    private readonly ExecutionStream _stream;
+
+    public StreamYieldAwaitable(ExecutionStream stream) {
+      _stream = stream;
+    }
 
     public StreamYieldAwaitable GetAwaiter() {
       return this;
@@ -21,10 +25,6 @@ namespace Streams.StreamTasks {
     }
 
     public void GetResult() {
-    }
-
-    internal void SetStream(ExecutionStream stream) {
-      _stream = stream;
     }
 
   }

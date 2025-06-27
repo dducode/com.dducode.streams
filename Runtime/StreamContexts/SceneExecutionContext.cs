@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Streams.Internal;
 using UnityEngine.SceneManagement;
 
 namespace Streams.StreamContexts {
@@ -32,7 +33,8 @@ namespace Streams.StreamContexts {
 
     private ExecutionStream CreateStream(Type systemType) {
       uint priority = SceneManager.GetActiveScene() == _scene ? 0 : uint.MaxValue;
-      var stream = new ManagedExecutionStream(UnityPlayerLoop.GetStream(systemType), $"{_scene.name}_{systemType.Name}") {
+      var name = $"{_scene.name}_{NamesUtility.CreateProfilerSampleName(systemType)}";
+      var stream = new ManagedExecutionStream(UnityPlayerLoop.GetStream(systemType), name) {
         Priority = priority
       };
       _streams.Add(systemType, stream);

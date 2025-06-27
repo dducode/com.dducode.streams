@@ -9,12 +9,12 @@ namespace Streams.StreamTasks {
   public partial class StreamTask : ITask {
 
     public static StreamTask CompletedTask { get; } = new() { IsCompleted = true };
-    public bool IsCompleted { get; private set; }
+    public bool IsCompleted { get; private protected set; }
 
     [CanBeNull] internal Exception Error { get; private set; }
 
-    private readonly Queue<(StreamTask nextTask, Action continuation)> _continuations = new(5);
-    private readonly Queue<(StreamTask nextTask, Func<StreamTask> asyncContinuation)> _asyncContinuations = new(5);
+    private readonly Queue<(StreamTask nextTask, Action continuation)> _continuations = new();
+    private readonly Queue<(StreamTask nextTask, Func<StreamTask> asyncContinuation)> _asyncContinuations = new();
 
     internal StreamTask() {
     }
@@ -74,29 +74,29 @@ namespace Streams.StreamTasks {
       Complete(exception);
     }
 
+    private void ContinueWith(StreamTask task, Exception error = null) {
+      if (error == null)
+        ContinueWith(task.SetResult);
+      else
+        ContinueWith(() => task.SetException(error));
+    }
+
     private void Complete(Exception error = null) {
       if (IsCompleted)
         return;
 
       Error = error;
 
-      while (_continuations.TryDequeue(out (StreamTask nextTask, Action continuation) x)) {
-        x.continuation();
+      while (_continuations.TryDequeue(out (StreamTask nextTask, Action continuation) pair)) {
+        pair.continuation();
         if (error == null)
-          x.nextTask.SetResult();
+          pair.nextTask.SetResult();
         else
-          x.nextTask.SetException(error);
+          pair.nextTask.SetException(error);
       }
 
-      while (_asyncContinuations.TryDequeue(out (StreamTask nextTask, Func<StreamTask> asyncContinuation) x)) {
-        if (error == null) {
-          x.asyncContinuation().ContinueWith(x.nextTask.SetResult);
-        }
-        else {
-          StreamTask nextTask = x.nextTask;
-          x.asyncContinuation().ContinueWith(() => nextTask.SetException(error));
-        }
-      }
+      while (_asyncContinuations.TryDequeue(out (StreamTask nextTask, Func<StreamTask> asyncContinuation) pair))
+        pair.asyncContinuation().ContinueWith(pair.nextTask, error);
 
       IsCompleted = true;
     }
@@ -110,8 +110,8 @@ namespace Streams.StreamTasks {
     [CanBeNull] internal Exception Error { get; private set; }
     internal TResult Result { get; private set; }
 
-    private readonly Queue<(StreamTask<TResult> nextTask, Action<TResult> continuation)> _continuations = new(5);
-    private readonly Queue<(StreamTask<TResult> nextTask, Func<TResult, StreamTask<TResult>> asyncContinuation)> _asyncContinuations = new(5);
+    private readonly Queue<(StreamTask<TResult> nextTask, Action<TResult> continuation)> _continuations = new();
+    private readonly Queue<(StreamTask<TResult> nextTask, Func<TResult, StreamTask<TResult>> asyncContinuation)> _asyncContinuations = new();
 
     internal StreamTask() {
     }
@@ -167,6 +167,13 @@ namespace Streams.StreamTasks {
       Complete(default, exception);
     }
 
+    private void ContinueWith(StreamTask<TResult> task, Exception error = null) {
+      if (error == null)
+        ContinueWith(task.SetResult);
+      else
+        ContinueWith(_ => task.SetException(error));
+    }
+
     private void Complete(TResult result, Exception error = null) {
       if (IsCompleted)
         return;
@@ -174,23 +181,16 @@ namespace Streams.StreamTasks {
       Result = result;
       Error = error;
 
-      while (_continuations.TryDequeue(out (StreamTask<TResult> nextTask, Action<TResult> continuation) x)) {
-        x.continuation(result);
+      while (_continuations.TryDequeue(out (StreamTask<TResult> nextTask, Action<TResult> continuation) pair)) {
+        pair.continuation(result);
         if (error == null)
-          x.nextTask.SetResult(result);
+          pair.nextTask.SetResult(result);
         else
-          x.nextTask.SetException(error);
+          pair.nextTask.SetException(error);
       }
 
-      while (_asyncContinuations.TryDequeue(out (StreamTask<TResult> nextTask, Func<TResult, StreamTask<TResult>> asyncContinuation) x)) {
-        if (error == null) {
-          x.asyncContinuation(result).ContinueWith(x.nextTask.SetResult);
-        }
-        else {
-          StreamTask<TResult> nextTask = x.nextTask;
-          x.asyncContinuation(result).ContinueWith(_ => nextTask.SetException(error));
-        }
-      }
+      while (_asyncContinuations.TryDequeue(out (StreamTask<TResult> nextTask, Func<TResult, StreamTask<TResult>> asyncContinuation) pair))
+        pair.asyncContinuation(result).ContinueWith(pair.nextTask, error);
 
       IsCompleted = true;
     }

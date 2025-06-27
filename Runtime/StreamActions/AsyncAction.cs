@@ -22,13 +22,8 @@ namespace Streams.StreamActions {
       _deltaTime = deltaTime;
       _task ??= InvokeAction();
 
-      if (!_task.IsCompleted)
-        return;
-
-      if (_task.Error != null)
-        throw _task.Error;
-
-      _task.Restart();
+      if (_task.IsCompleted)
+        _task.Restart();
     }
 
   }

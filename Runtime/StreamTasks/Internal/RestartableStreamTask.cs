@@ -11,8 +11,9 @@ namespace Streams.StreamTasks.Internal {
     }
 
     internal void Restart() {
+      if (Error != null)
+        throw Error;
       IsCompleted = false;
-      Error = null;
       StateMachine.MoveNext();
     }
 

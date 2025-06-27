@@ -6,6 +6,7 @@ using Streams.Internal;
 using Streams.StreamActions;
 using Streams.StreamTasks;
 using Streams.StreamTasks.Internal;
+using UnityEngine;
 using UnityEngine.Profiling;
 using Debug = UnityEngine.Debug;
 
@@ -55,6 +56,8 @@ namespace Streams {
     private readonly ActionsStorage _actionsStorage = new();
     private readonly ActionsStorage _parallelActionsStorage = new();
     private readonly Queue<StreamTask> _waitedTasks = new();
+    private readonly List<(float time, StreamTask task)> _delayedTasks = new();
+    private readonly List<(float time, Action continuation)> _delayedContinuations = new();
     private readonly Queue<Action> _continuations = new();
 
     private readonly ParallelActionsWorker _worker = new();
@@ -268,11 +271,23 @@ namespace Streams {
     }
 
     internal void ScheduleContinuation(Action continuation) {
+      ValidateStreamState();
       _continuations.Enqueue(continuation);
     }
 
+    internal void ScheduleDelayContinuation(float time, Action continuation) {
+      ValidateStreamState();
+      _delayedContinuations.Add((Time.time + time, continuation));
+    }
+
     internal void ScheduleTaskCompletion(StreamTask task) {
+      ValidateStreamState();
       _waitedTasks.Enqueue(task);
+    }
+
+    internal void ScheduleDelayTaskCompletion(float time, StreamTask task) {
+      ValidateStreamState();
+      _delayedTasks.Add((Time.time + time, task));
     }
 
     internal void Update(float deltaTime) {
@@ -310,7 +325,13 @@ namespace Streams {
     }
 
     private bool CanExecute() {
-      return (_actionsStorage.Count != 0 || _parallelActionsStorage.Count != 0 || _waitedTasks.Count != 0 || _continuations.Count != 0) && !Locked;
+      return (_actionsStorage.Count != 0 ||
+              _parallelActionsStorage.Count != 0 ||
+              _waitedTasks.Count != 0 ||
+              _delayedTasks.Count != 0 ||
+              _continuations.Count != 0 ||
+              _delayedContinuations.Count != 0
+        ) && !Locked;
     }
 
     private void ValidateExecution() {
@@ -336,14 +357,9 @@ namespace Streams {
       _streamsStack.Push(this);
       Profiler.BeginSample(_profilerName);
 
-      while (_waitedTasks.TryDequeue(out StreamTask task))
-        task.SetResult();
-
-      while (_continuations.TryDequeue(out Action continuation))
-        continuation();
-
       _worker.Start(deltaTime, _parallelActionsStorage.Count, WorkStrategy, _handleParallelAction);
 
+      PrepareCompletions();
       for (var i = 0; i < _actionsStorage.Count; i++)
         HandleAction(deltaTime, _actionsStorage, i);
 
@@ -352,6 +368,26 @@ namespace Streams {
       Profiler.EndSample();
       _streamsStack.Pop();
       State = StreamState.Idle;
+    }
+
+    private void PrepareCompletions() {
+      while (_continuations.TryDequeue(out Action continuation))
+        continuation();
+
+      foreach ((float time, Action continuation) pair in _delayedContinuations)
+        if (Time.time >= pair.time)
+          pair.continuation();
+
+      _delayedContinuations.RemoveAll(pair => Time.time >= pair.time);
+
+      while (_waitedTasks.TryDequeue(out StreamTask task))
+        task.SetResult();
+
+      foreach ((float time, StreamTask task) pair in _delayedTasks)
+        if (Time.time >= pair.time)
+          pair.task.SetResult();
+
+      _delayedTasks.RemoveAll(pair => pair.task.IsCompleted);
     }
 
     private void HandleParallelAction(float deltaTime, int index) {
