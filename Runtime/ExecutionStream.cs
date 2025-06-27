@@ -66,12 +66,14 @@ namespace Streams {
     private readonly string _name;
     private readonly string _profilerName;
 
+    private readonly Action _lockersDecrement;
     private int _lockers;
 
     internal ExecutionStream(string name) {
       _name = name;
       _profilerName = $"{_name} (stream)";
       _handleParallelAction = HandleParallelAction;
+      _lockersDecrement = () => _lockers--;
     }
 
     /// <summary>
@@ -81,29 +83,10 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public PersistentAction Add([NotNull] Action<PersistentAction> action, StreamToken token = default) {
+    public PersistentAction Add([NotNull] Action<SelfClosingAction> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new PersistentAction(action, token);
-      _actionsStorage.Add(streamAction);
-      return streamAction;
-    }
-
-    /// <summary>
-    /// Adds a new action to be performed
-    /// </summary>
-    /// <param name="condition"> The action will be performed when the condition is true </param>
-    /// <param name="action"> The action to be performed </param>
-    /// <param name="token"> Token for cancelling an action </param>
-    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
-    /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public ConditionalAction Add(
-      [NotNull] Func<bool> condition, [NotNull] Action<ConditionalAction> action, StreamToken token = default) {
-      ValidateAddAction(action);
-      if (condition == null)
-        throw new ArgumentNullException(nameof(condition));
-
-      var streamAction = new ConditionalAction(action, condition, token);
       _actionsStorage.Add(streamAction);
       return streamAction;
     }
@@ -119,7 +102,7 @@ namespace Streams {
     /// <remarks> It is worth distinguishing a temporary action from a timer.
     /// A temporary action is executed every tick of the stream for a specified time,
     /// and a timer executes the action once after the time has elapsed. </remarks>
-    public TemporalAction Add(float time, [NotNull] Action<TemporalAction> action, StreamToken token = default) {
+    public TemporalAction Add(float time, [NotNull] Action<SelfClosingAction> action, StreamToken token = default) {
       if (time <= 0) {
         Debug.LogWarning($"Time is negative or zero: {time}");
         return null;
@@ -139,7 +122,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public AsyncAction Add([NotNull] Func<AsyncAction, RestartableStreamTask> action, StreamToken token = default) {
+    public AsyncAction Add([NotNull] Func<SelfClosingAction<RestartableTask>, RestartableTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new AsyncAction(action, token);
@@ -154,7 +137,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public PersistentAction AddParallel([NotNull] Action<PersistentAction> action, StreamToken token = default) {
+    public PersistentAction AddParallel([NotNull] Action<SelfClosingAction> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new PersistentAction(action, token);
@@ -169,7 +152,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public OnceAction AddOnce([NotNull] Action action, StreamToken token = default) {
+    public ICompletable AddOnce([NotNull] Action action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new OnceAction(action, token);
@@ -184,7 +167,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public AsyncOnceAction AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
+    public ICompletable AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new AsyncOnceAction(action, token);
@@ -203,7 +186,7 @@ namespace Streams {
     /// <remarks> It is worth distinguishing a timer from a temporary action.
     /// A temporary action is executed every tick of the stream for a specified time,
     /// and a timer executes the action once after the time has elapsed. </remarks>
-    public StreamTimer AddTimer(float time, [NotNull] Action onComplete, StreamToken token = default) {
+    public ICompletable AddTimer(float time, [NotNull] Action onComplete, StreamToken token = default) {
       if (time <= 0)
         throw new ArgumentOutOfRangeException(nameof(time), $"Time is negative or zero: {time}");
 
@@ -230,7 +213,7 @@ namespace Streams {
 
       ValidateStreamState();
       _lockers++;
-      lockToken.Register(() => _lockers--);
+      lockToken.Register(_lockersDecrement);
     }
 
     /// <summary>
@@ -325,13 +308,12 @@ namespace Streams {
     }
 
     private bool CanExecute() {
-      return (_actionsStorage.Count != 0 ||
-              _parallelActionsStorage.Count != 0 ||
-              _waitedTasks.Count != 0 ||
-              _delayedTasks.Count != 0 ||
-              _continuations.Count != 0 ||
-              _delayedContinuations.Count != 0
-        ) && !Locked;
+      return !Locked && (_actionsStorage.Count != 0 ||
+                         _parallelActionsStorage.Count != 0 ||
+                         _waitedTasks.Count != 0 ||
+                         _delayedTasks.Count != 0 ||
+                         _continuations.Count != 0 ||
+                         _delayedContinuations.Count != 0);
     }
 
     private void ValidateExecution() {

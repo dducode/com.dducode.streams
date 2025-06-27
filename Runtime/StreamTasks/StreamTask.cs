@@ -74,11 +74,14 @@ namespace Streams.StreamTasks {
       Complete(exception);
     }
 
-    private void ContinueWith(StreamTask task, Exception error = null) {
-      if (error == null)
+    internal void ContinueWith(StreamTask task, Exception error) {
+      if (error == null) {
         ContinueWith(task.SetResult);
-      else
+      }
+      else {
         ContinueWith(() => task.SetException(error));
+        SetException(error);
+      }
     }
 
     private void Complete(Exception error = null) {
@@ -167,11 +170,14 @@ namespace Streams.StreamTasks {
       Complete(default, exception);
     }
 
-    private void ContinueWith(StreamTask<TResult> task, Exception error = null) {
-      if (error == null)
+    private void ContinueWith(StreamTask<TResult> task, Exception error) {
+      if (error == null) {
         ContinueWith(task.SetResult);
-      else
+      }
+      else {
         ContinueWith(_ => task.SetException(error));
+        SetException(error);
+      }
     }
 
     private void Complete(TResult result, Exception error = null) {

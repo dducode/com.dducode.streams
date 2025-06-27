@@ -2,12 +2,12 @@ using System.Runtime.CompilerServices;
 
 namespace Streams.StreamTasks.Internal {
 
-  [AsyncMethodBuilder(typeof(RestartableStreamTaskMethodBuilder))]
-  public sealed class RestartableStreamTask : StreamTask {
+  [AsyncMethodBuilder(typeof(RestartableTaskMethodBuilder))]
+  public sealed class RestartableTask : StreamTask {
 
     internal IAsyncStateMachine StateMachine { get; set; }
 
-    internal RestartableStreamTask() {
+    internal RestartableTask() {
     }
 
     internal void Restart() {

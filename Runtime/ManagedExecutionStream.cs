@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using Streams.Exceptions;
 using Streams.StreamActions;
 using UnityEngine;
@@ -26,7 +25,7 @@ namespace Streams {
         if (_priority == value)
           return;
 
-        _execution.Priority = _priority = value;
+        _execution.SetPriority(_priority = value);
       }
     }
 
@@ -98,8 +97,7 @@ namespace Streams {
     ) : base(name) {
       _subscriptionHandle = new StreamTokenSource();
       _baseStream = baseStream;
-      _execution = _baseStream.Add(self => Update(self.DeltaTime), _subscriptionHandle.Token);
-      _execution.Priority = _priority;
+      _execution = _baseStream.Add(self => Update(self.DeltaTime), _subscriptionHandle.Token).SetPriority(_priority);
       _baseStream.OnTerminate(Dispose, _subscriptionHandle.Token);
     }
 
@@ -142,7 +140,7 @@ namespace Streams {
       if (_delta.HasValue)
         _execution.SetDelta(_delta.Value);
       if (priority != null)
-        _execution.Priority = _priority;
+        _execution.SetPriority(_priority);
     }
 
     /// <summary>

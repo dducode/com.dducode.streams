@@ -54,7 +54,7 @@ namespace Streams.Tests {
       };
       sts.Token.Register(stream.Terminate);
 
-      Action<PersistentAction> work = _ => {
+      Action<SelfClosingAction> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();
         for (var j = 0; j < 1000; j++)
           matrix *= matrix;
@@ -89,7 +89,7 @@ namespace Streams.Tests {
       };
       sts.Token.Register(stream.Terminate);
 
-      Action<PersistentAction> work = _ => {
+      Action<SelfClosingAction> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();
         for (var j = 0; j < 1000; j++)
           matrix *= matrix;

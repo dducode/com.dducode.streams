@@ -3,14 +3,15 @@ using Streams.StreamTasks.Internal;
 
 namespace Streams.StreamActions {
 
-  public class AsyncAction : SelfClosingAction<AsyncAction, RestartableStreamTask> {
+  public class AsyncAction : SelfClosingAction<RestartableTask> {
 
     public override float DeltaTime => _deltaTime;
 
-    private RestartableStreamTask _task;
+    private RestartableTask _task;
     private float _deltaTime;
 
-    internal AsyncAction(Func<AsyncAction, RestartableStreamTask> action, StreamToken cancellationToken) : base(action, cancellationToken) {
+    internal AsyncAction(Func<SelfClosingAction<RestartableTask>, RestartableTask> action, StreamToken cancellationToken) :
+      base(action, cancellationToken) {
     }
 
     internal override void Invoke(float deltaTime) {
@@ -19,11 +20,18 @@ namespace Streams.StreamActions {
         return;
       }
 
+      if (!CanExecute())
+        return;
+
       _deltaTime = deltaTime;
       _task ??= InvokeAction();
 
-      if (_task.IsCompleted)
-        _task.Restart();
+      try {
+        if (_task.IsCompleted)
+          _task.Restart();
+      }
+      catch (InterruptException) {
+      }
     }
 
   }

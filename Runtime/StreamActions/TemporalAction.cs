@@ -1,11 +1,10 @@
 using System;
-using System.Threading;
 using Streams.StreamActions.Components;
 using UnityEngine;
 
 namespace Streams.StreamActions {
 
-  public sealed class TemporalAction : SelfClosingAction<TemporalAction>, IConfigurable<TemporalAction>, ICompletable {
+  public sealed class TemporalAction : SelfClosingAction, IConfigurable<TemporalAction>, ICompletable {
 
     public override float DeltaTime => _configuration.HasDelta ? _configuration.Delta : _accumulatedDeltaTime;
 
@@ -16,7 +15,7 @@ namespace Streams.StreamActions {
     private ulong _ticks;
     private float _accumulatedDeltaTime;
 
-    internal TemporalAction(Action<TemporalAction> action, float time, StreamToken cancellationToken) : base(action, cancellationToken) {
+    internal TemporalAction(Action<SelfClosingAction> action, float time, StreamToken cancellationToken) : base(action, cancellationToken) {
       _remainingTime = time;
     }
 
@@ -38,12 +37,17 @@ namespace Streams.StreamActions {
       return this;
     }
 
+    public TemporalAction SetPriority(uint value) {
+      Priority = value;
+      return this;
+    }
+
     public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
       _completion.OnComplete(onComplete, subscriptionToken);
     }
 
     internal override void Invoke(float deltaTime) {
-      if (Canceled())
+      if (!CanExecute())
         return;
 
       if (_remainingTime == 0) {

@@ -5,6 +5,7 @@ namespace Streams.StreamActions {
     public TConcrete SetDelta(float value);
     public TConcrete ResetDelta();
     public TConcrete SetTickRate(uint value);
+    public TConcrete SetPriority(uint value);
 
   }
 

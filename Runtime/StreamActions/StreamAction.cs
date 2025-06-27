@@ -8,18 +8,11 @@ namespace Streams.StreamActions {
     private static int NextId => ++_nextId;
     private static int _nextId = -1;
 
-    public string Name {
-      get => _name;
-      set {
-        if (string.IsNullOrEmpty(value))
-          throw new ArgumentNullException(nameof(Name));
-        _name = value;
-      }
-    }
+    public string Name { get; }
 
     public uint Priority {
       get => _priority;
-      set {
+      private protected set {
         _priority = value;
         OnPriorityChanged?.Invoke();
       }
@@ -32,14 +25,13 @@ namespace Streams.StreamActions {
     private string ActionName => Action.Method.Name;
 
     private Action _cancelCallbacks;
-    private string _name;
     private bool _canceled;
     private uint _priority;
 
     private protected StreamAction(StreamToken cancellationToken) {
       cancellationToken.Register(() => _canceled = true);
       _priority = uint.MaxValue;
-      _name = GetType().Name;
+      Name = GetType().Name;
     }
 
     public void OnCancel([NotNull] Action onCancel, StreamToken subscriptionToken = default) {

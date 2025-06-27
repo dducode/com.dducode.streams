@@ -5,19 +5,19 @@ using JetBrains.Annotations;
 namespace Streams.StreamTasks.Internal {
 
   [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-  public struct RestartableStreamTaskMethodBuilder {
+  public struct RestartableTaskMethodBuilder {
 
-    public RestartableStreamTask Task { get; private set; }
+    public RestartableTask Task { get; private set; }
     private IAsyncStateMachineRunner StateMachineRunner { get; set; }
     private Action _stateMachineMoveNext;
 
-    public static RestartableStreamTaskMethodBuilder Create() {
-      return new RestartableStreamTaskMethodBuilder();
+    public static RestartableTaskMethodBuilder Create() {
+      return new RestartableTaskMethodBuilder();
     }
 
     public void Start<TStateMachine>(ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine {
       stateMachine.MoveNext();
-      Task = new RestartableStreamTask { StateMachine = stateMachine };
+      Task = new RestartableTask { StateMachine = stateMachine };
     }
 
     public void SetStateMachine(IAsyncStateMachine stateMachine) {

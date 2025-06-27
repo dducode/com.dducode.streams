@@ -1,4 +1,3 @@
-using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using Streams.Tests.Attributes;
@@ -57,13 +56,17 @@ namespace Streams.Tests {
     }
 
     [Test, Common]
-    public async Task ConditionalTest() {
+    public async Task ConditionalSleepTest() {
       var tcs = new TaskCompletionSource<bool>();
       var canRun = true;
 
       UnityPlayerLoop.GetStream<Update>()
-        .Add(() => canRun, self => Debug.Log(self.DeltaTime))
-        .SetDelta(0.1f); // TODO: fix test
+        .Add(self => {
+          if (!canRun)
+            self.Sleep(() => canRun);
+          Debug.Log(self.DeltaTime);
+        })
+        .SetDelta(0.1f);
 
       UnityPlayerLoop.GetStream<Update>().AddTimer(2, () => canRun = false);
       UnityPlayerLoop.GetStream<Update>().AddTimer(4, () => canRun = true);
@@ -148,30 +151,6 @@ namespace Streams.Tests {
           });
         });
       });
-      Assert.IsTrue(await tcs.Task);
-    }
-
-    [Test, Common]
-    public async Task SelfClosingActionTest() {
-      var tcs = new TaskCompletionSource<bool>();
-      var time = 0f;
-
-      UnityPlayerLoop.GetStream<Update>().Add(self => {
-        time += self.DeltaTime;
-        Debug.Log(self.DeltaTime);
-        switch (time) {
-          case > 3:
-            tcs.SetResult(true);
-            break;
-          case > 2:
-            self.SetDelta(0.25f);
-            break;
-          case > 1:
-            self.SetDelta(0.5f);
-            break;
-        }
-      }).SetDelta(0.1f);
-
       Assert.IsTrue(await tcs.Task);
     }
 

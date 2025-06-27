@@ -1,11 +1,10 @@
 using System;
-using System.Threading;
 using Streams.StreamActions.Components;
 using UnityEngine;
 
 namespace Streams.StreamActions {
 
-  public sealed class PersistentAction : SelfClosingAction<PersistentAction>, IConfigurable<PersistentAction> {
+  public sealed class PersistentAction : SelfClosingAction, IConfigurable<PersistentAction> {
 
     public override float DeltaTime => _configuration.HasDelta ? _configuration.Delta : _accumulatedDeltaTime;
 
@@ -14,7 +13,7 @@ namespace Streams.StreamActions {
     private ulong _ticks;
     private float _accumulatedDeltaTime;
 
-    internal PersistentAction(Action<PersistentAction> action, StreamToken cancellationToken) : base(action, cancellationToken) {
+    internal PersistentAction(Action<SelfClosingAction> action, StreamToken cancellationToken) : base(action, cancellationToken) {
     }
 
     public PersistentAction SetDelta(float value) {
@@ -35,8 +34,13 @@ namespace Streams.StreamActions {
       return this;
     }
 
+    public PersistentAction SetPriority(uint value) {
+      Priority = value;
+      return this;
+    }
+
     internal override void Invoke(float deltaTime) {
-      if (Canceled())
+      if (!CanExecute())
         return;
 
       _ticks++;
