@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using NUnit.Framework;
 using Unity.PerformanceTesting;
 using UnityEngine;
@@ -26,7 +25,7 @@ namespace Streams.Tests {
 
     [Test, Performance]
     public void ManyStreamsTest() {
-      var sts = new CancellationTokenSource();
+      var sts = new StreamTokenSource();
       var baseStream = new ExecutionStream("base");
       sts.Token.Register(baseStream.Terminate);
 
@@ -42,12 +41,12 @@ namespace Streams.Tests {
         .MeasurementCount(60)
         .Run();
 
-      sts.Cancel();
+      sts.Release();
     }
 
     [Test, Performance]
     public void ManyActionsTest([ValueSource(nameof(_executionType))] ExecutionType executionType) {
-      var sts = new CancellationTokenSource();
+      var sts = new StreamTokenSource();
       var stream = new ExecutionStream("Stream") {
         WorkStrategy = ParallelWorkStrategy.Performance
       };
@@ -77,12 +76,12 @@ namespace Streams.Tests {
         .MeasurementCount(60)
         .Run();
 
-      sts.Cancel();
+      sts.Release();
     }
 
     [Test, Performance]
     public void ParallelWorkStrategyTest([ValueSource(nameof(_parallelWorkStrategies))] ParallelWorkStrategy strategy) {
-      var sts = new CancellationTokenSource();
+      var sts = new StreamTokenSource();
       var stream = new ExecutionStream("Stream") {
         WorkStrategy = strategy
       };
@@ -102,7 +101,7 @@ namespace Streams.Tests {
         .MeasurementCount(60)
         .Run();
 
-      sts.Cancel();
+      sts.Release();
     }
 
     private static readonly Random _random = new();

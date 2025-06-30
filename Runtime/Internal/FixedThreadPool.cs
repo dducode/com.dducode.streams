@@ -26,7 +26,8 @@ namespace Streams.Internal {
         _threads[i].Start();
       }
 
-      Application.quitting += Shutdown;
+      if (!Application.isEditor)
+        Application.quitting += Shutdown;
     }
 
     public static void QueueWorkItem([NotNull] Action<WorkerState> task, [NotNull] WorkerState state) {

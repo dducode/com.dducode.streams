@@ -34,7 +34,7 @@ namespace Streams.Zenject {
       var name = $"LocalStream_{NamesUtility.CreateProfilerSampleName(systemType)}";
       var stream = new ManagedExecutionStream(baseStream, name);
       _streams.Add(systemType, stream);
-      _disposeHandle.Token.Register(stream.Terminate);
+      _disposeHandle.Token.Register(stream.Dispose);
       ExecutionContexts.All.Add(stream, this);
       stream.OnTerminate(() => {
         _streams.Remove(systemType);
