@@ -35,7 +35,7 @@ namespace Streams.Tests {
       SetFailureAfterTime(2, tcs);
       var flag = false;
       ExecutionStream stream = UnityPlayerLoop.GetStream<Update>();
-      stream.AddTimer(1, () => flag = true);
+      stream.AddDelayed(1, () => flag = true);
       stream.AddOnce(async () => {
         await StreamTask.WaitWhile(() => !flag);
         tcs.SetResult(true);
@@ -197,7 +197,7 @@ namespace Streams.Tests {
           tcs.SetResult(true);
         }
       });
-      UnityPlayerLoop.GetStream<Update>().AddTimer(0.5f, () => sts.Release());
+      UnityPlayerLoop.GetStream<Update>().AddDelayed(0.5f, () => sts.Release());
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -264,7 +264,7 @@ namespace Streams.Tests {
     }
 
     private void SetFailureAfterTime(float time, TaskCompletionSource<bool> tcs) {
-      UnityPlayerLoop.GetStream<Update>().AddTimer(time, () => tcs.SetResult(false));
+      UnityPlayerLoop.GetStream<Update>().AddDelayed(time, () => tcs.SetResult(false));
     }
 
   }

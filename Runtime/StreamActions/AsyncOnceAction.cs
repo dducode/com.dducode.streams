@@ -4,7 +4,9 @@ using Streams.StreamTasks;
 
 namespace Streams.StreamActions {
 
-  public class AsyncOnceAction : StreamAction, ICompletable {
+  public class AsyncOnceAction : StreamActionBase, ICompletable {
+
+    public bool IsCompleted => _completion.IsCompleted;
 
     private protected override Delegate Action => _action;
 
@@ -21,10 +23,7 @@ namespace Streams.StreamActions {
     }
 
     internal override void Invoke(float deltaTime) {
-      if (Canceled()) {
-        _task?.SetCanceled();
-        return;
-      }
+      base.Invoke(deltaTime);
 
       _task ??= _action();
 

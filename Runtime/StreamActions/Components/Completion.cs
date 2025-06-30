@@ -4,8 +4,9 @@ namespace Streams.StreamActions.Components {
 
   internal class Completion : ICompletable {
 
+    public bool IsCompleted { get; private set; }
+
     private Action _completeCallbacks;
-    private bool _completed;
 
     public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
       if (onComplete == null)
@@ -14,7 +15,7 @@ namespace Streams.StreamActions.Components {
       if (subscriptionToken.Released)
         return;
 
-      if (_completed) {
+      if (IsCompleted) {
         onComplete();
         return;
       }
@@ -24,15 +25,14 @@ namespace Streams.StreamActions.Components {
     }
 
     public void Complete() {
-      if (_completed)
+      if (IsCompleted)
         return;
-
-      _completed = true;
 
       try {
         _completeCallbacks?.Invoke();
       }
       finally {
+        IsCompleted = true;
         _completeCallbacks = null;
       }
     }

@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using NUnit.Framework;
-using Streams.StreamActions;
 using Unity.PerformanceTesting;
 using UnityEngine;
 using Random = System.Random;
@@ -34,7 +33,7 @@ namespace Streams.Tests {
       for (var i = 0; i < 1000; i++) {
         var stream = new ExecutionStream($"Stream {i}");
         sts.Token.Register(stream.Terminate);
-        baseStream.Add(self => stream.Update(self.DeltaTime));
+        baseStream.Add(stream.Update);
         stream.Add(_ => { });
       }
 
@@ -54,7 +53,7 @@ namespace Streams.Tests {
       };
       sts.Token.Register(stream.Terminate);
 
-      Action<SelfClosingAction> work = _ => {
+      Action<float> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();
         for (var j = 0; j < 1000; j++)
           matrix *= matrix;
@@ -63,7 +62,7 @@ namespace Streams.Tests {
       for (var i = 0; i < 100; i++) {
         switch (executionType) {
           case ExecutionType.Parallel:
-            stream.AddParallel(work);
+            stream.AddConcurrent(work);
             break;
           case ExecutionType.Sequential:
             stream.Add(work);
@@ -89,14 +88,14 @@ namespace Streams.Tests {
       };
       sts.Token.Register(stream.Terminate);
 
-      Action<SelfClosingAction> work = _ => {
+      Action<float> work = _ => {
         Matrix4x4 matrix = GetRandomMatrix();
         for (var j = 0; j < 1000; j++)
           matrix *= matrix;
       };
 
       for (var i = 0; i < 100; i++)
-        stream.AddParallel(work);
+        stream.AddConcurrent(work);
 
       Measure.Method(() => stream.Update(Time.deltaTime))
         .WarmupCount(5)

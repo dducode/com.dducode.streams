@@ -1,11 +1,16 @@
+using System;
+
 namespace Streams.StreamActions {
 
-  public interface IConfigurable<out TConcrete> {
+  public interface IConfigurable {
 
-    public TConcrete SetDelta(float value);
-    public TConcrete ResetDelta();
-    public TConcrete SetTickRate(uint value);
-    public TConcrete SetPriority(uint value);
+    public uint Priority { get; }
+    public event Action OnPriorityChanged;
+    public IConfigurable SetDelta(float value);
+    public IConfigurable ResetDelta();
+    public IConfigurable SetTickRate(uint value);
+    public IConfigurable SetPriority(uint value);
+    void Lock(StreamToken lockToken);
 
   }
 

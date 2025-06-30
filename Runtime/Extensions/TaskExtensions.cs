@@ -19,7 +19,7 @@ namespace Streams.Extensions {
     public static StreamTask<TResult> ToStreamTask<TResult>(this Task<TResult> task) {
       var streamTask = new StreamTask<TResult>();
       ExecutionStream runningStream = StreamTaskHelper.GetRunningStream();
-      task.ContinueWith(t => runningStream.AddOnce(() => streamTask.SetResult(t.Result)));
+      task.ContinueWith(t => runningStream.ScheduleContinuation(() => streamTask.SetResult(t.Result)));
       return streamTask;
     }
 
@@ -33,7 +33,7 @@ namespace Streams.Extensions {
     public static StreamTask<Object> ToStreamTask(this ResourceRequest request) {
       var streamTask = new StreamTask<Object>();
       ExecutionStream runningStream = StreamTaskHelper.GetRunningStream();
-      request.completed += _ => runningStream.AddOnce(() => streamTask.SetResult(request.asset));
+      request.completed += _ => runningStream.ScheduleContinuation(() => streamTask.SetResult(request.asset));
       return streamTask;
     }
 
@@ -48,7 +48,7 @@ namespace Streams.Extensions {
     public static StreamTask<TResult> ToStreamTask<TResult>(this UniTask<TResult> uniTask) {
       var streamTask = new StreamTask<TResult>();
       ExecutionStream runningStream = StreamTaskHelper.GetRunningStream();
-      uniTask.ContinueWith(result => runningStream.AddOnce(() => streamTask.SetResult(result)));
+      uniTask.ContinueWith(result => runningStream.ScheduleContinuation(() => streamTask.SetResult(result)));
       return streamTask;
     }
 #endif
@@ -64,7 +64,7 @@ namespace Streams.Extensions {
     public static StreamTask<TResult> ToStreamTask<TResult>(this Awaitable<TResult> awaitable) {
       var streamTask = new StreamTask<TResult>();
       ExecutionStream runningStream = StreamTaskHelper.GetRunningStream();
-      awaitable.GetAwaiter().OnCompleted(() => runningStream.AddOnce(() => streamTask.SetResult(awaitable.GetAwaiter().GetResult())));
+      awaitable.GetAwaiter().OnCompleted(() => runningStream.ScheduleContinuation(() => streamTask.SetResult(awaitable.GetAwaiter().GetResult())));
       return streamTask;
     }
 #endif

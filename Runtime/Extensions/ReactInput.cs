@@ -58,9 +58,9 @@ namespace Streams.Extensions {
 
     private static void WhenHold(Func<bool> condition, Action<float> handler, StreamToken token) {
       var holdingTime = 0f;
-      UnityPlayerLoop.GetStream<Update>().Add(self => {
+      UnityPlayerLoop.GetStream<Update>().Add(deltaTime => {
         if (condition())
-          handler(holdingTime += self.DeltaTime);
+          handler(holdingTime += deltaTime);
         else
           holdingTime = 0;
       }, token);

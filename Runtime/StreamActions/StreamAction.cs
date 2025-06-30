@@ -1,69 +1,87 @@
 using System;
-using JetBrains.Annotations;
+using Streams.StreamActions.Components;
+using UnityEngine;
 
 namespace Streams.StreamActions {
 
-  public abstract class StreamAction {
-
-    private static int NextId => ++_nextId;
-    private static int _nextId = -1;
-
-    public string Name { get; }
+  public sealed class StreamAction : StreamActionBase, IConfigurable {
 
     public uint Priority {
       get => _priority;
-      private protected set {
+      private set {
         _priority = value;
         OnPriorityChanged?.Invoke();
       }
     }
 
-    internal int Id { get; } = NextId;
+    public event Action OnPriorityChanged;
 
-    internal event Action OnPriorityChanged;
-    private protected abstract Delegate Action { get; }
-    private string ActionName => Action.Method.Name;
+    private protected override Delegate Action => _action;
+    private bool IsLocked => _lockers > 0;
+    private readonly Configuration _configuration = new();
+    private readonly Action<float> _action;
 
-    private Action _cancelCallbacks;
-    private bool _canceled;
-    private uint _priority;
+    private ulong _ticks;
+    private float _accumulatedDeltaTime;
+    private uint _priority = uint.MaxValue;
 
-    private protected StreamAction(StreamToken cancellationToken) {
-      cancellationToken.Register(() => _canceled = true);
-      _priority = uint.MaxValue;
-      Name = GetType().Name;
+    private int _lockers;
+    private readonly Action _lockersDecrement;
+
+    internal StreamAction(Action<float> action, StreamToken cancellationToken) : base(cancellationToken) {
+      _action = action;
+      _lockersDecrement = () => _lockers--;
     }
 
-    public void OnCancel([NotNull] Action onCancel, StreamToken subscriptionToken = default) {
-      if (onCancel == null)
-        throw new ArgumentNullException(nameof(onCancel));
+    public IConfigurable SetDelta(float value) {
+      _configuration.Delta = value;
+      _accumulatedDeltaTime = 0;
+      return this;
+    }
 
-      if (subscriptionToken.Released)
+    public IConfigurable ResetDelta() {
+      _configuration.ResetDelta();
+      _accumulatedDeltaTime = 0;
+      return this;
+    }
+
+    public IConfigurable SetTickRate(uint value) {
+      _configuration.TickRate = value;
+      _accumulatedDeltaTime = 0;
+      return this;
+    }
+
+    public IConfigurable SetPriority(uint value) {
+      Priority = value;
+      return this;
+    }
+
+    public void Lock(StreamToken lockToken) {
+      _lockers++;
+      lockToken.Register(_lockersDecrement);
+    }
+
+    internal override void Invoke(float deltaTime) {
+      base.Invoke(deltaTime);
+      if (IsLocked)
         return;
 
-      if (_canceled) {
-        onCancel();
+      _ticks++;
+      _accumulatedDeltaTime += deltaTime;
+
+      if (!_configuration.HasDelta) {
+        if (_ticks % _configuration.TickRate == 0) {
+          _action(_accumulatedDeltaTime);
+          _accumulatedDeltaTime = 0;
+        }
+
         return;
       }
 
-      _cancelCallbacks += onCancel;
-      subscriptionToken.Register(() => _cancelCallbacks -= onCancel);
-    }
-
-    public override string ToString() {
-      return $"{Name} ({ActionName})";
-    }
-
-    internal abstract void Invoke(float deltaTime);
-
-    private protected bool Canceled() {
-      if (_canceled) {
-        _cancelCallbacks?.Invoke();
-        _cancelCallbacks = null;
-        return true;
+      while (_accumulatedDeltaTime > _configuration.Delta || Mathf.Approximately(_accumulatedDeltaTime, _configuration.Delta)) {
+        _action(_configuration.Delta);
+        _accumulatedDeltaTime -= _configuration.Delta;
       }
-
-      return false;
     }
 
   }

@@ -3,7 +3,9 @@ using Streams.StreamActions.Components;
 
 namespace Streams.StreamActions {
 
-  public sealed class StreamTimer : StreamAction, ICompletable {
+  public sealed class DelayedAction : StreamActionBase, ICompletable {
+
+    public bool IsCompleted => _completion.IsCompleted;
 
     private protected override Delegate Action => _action;
 
@@ -11,7 +13,7 @@ namespace Streams.StreamActions {
     private readonly Completion _completion = new();
     private float _remainingTime;
 
-    internal StreamTimer(float time, Action action, StreamToken cancellationToken) : base(cancellationToken) {
+    internal DelayedAction(float time, Action action, StreamToken cancellationToken) : base(cancellationToken) {
       _action = action;
       _remainingTime = time;
     }
@@ -21,15 +23,14 @@ namespace Streams.StreamActions {
     }
 
     internal override void Invoke(float deltaTime) {
-      if (Canceled())
-        return;
-
+      base.Invoke(deltaTime);
       _remainingTime = Math.Max(0, _remainingTime - deltaTime);
 
-      if (_remainingTime == 0) {
-        _action();
-        _completion.Complete();
-      }
+      if (_remainingTime > 0)
+        return;
+
+      _action();
+      _completion.Complete();
     }
 
   }

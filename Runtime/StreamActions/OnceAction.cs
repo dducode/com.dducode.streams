@@ -3,7 +3,9 @@ using Streams.StreamActions.Components;
 
 namespace Streams.StreamActions {
 
-  public sealed class OnceAction : StreamAction, ICompletable {
+  public sealed class OnceAction : StreamActionBase, ICompletable {
+
+    public bool IsCompleted => _completion.IsCompleted;
 
     private protected override Delegate Action => _action;
 
@@ -19,9 +21,7 @@ namespace Streams.StreamActions {
     }
 
     internal override void Invoke(float deltaTime) {
-      if (Canceled())
-        return;
-
+      base.Invoke(deltaTime);
       _action();
       _completion.Complete();
     }

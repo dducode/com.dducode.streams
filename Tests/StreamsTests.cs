@@ -1,5 +1,7 @@
 using System.Threading.Tasks;
 using NUnit.Framework;
+using Streams.Extensions;
+using Streams.StreamActions;
 using Streams.Tests.Attributes;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
@@ -13,8 +15,8 @@ namespace Streams.Tests {
     public async Task DeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
       var cts = new StreamTokenSource();
-      UnityPlayerLoop.GetStream<Update>().Add(self => {
-        tcs.SetResult(Mathf.Approximately(self.DeltaTime, Time.deltaTime));
+      UnityPlayerLoop.GetStream<Update>().Add(deltaTime => {
+        tcs.SetResult(Mathf.Approximately(deltaTime, Time.deltaTime));
         cts.Release();
       }, cts.Token);
 
@@ -25,8 +27,8 @@ namespace Streams.Tests {
     public async Task FixedDeltaTest() {
       var tcs = new TaskCompletionSource<bool>();
       var cts = new StreamTokenSource();
-      UnityPlayerLoop.GetStream<FixedUpdate>().Add(self => {
-        tcs.SetResult(Mathf.Approximately(self.DeltaTime, Time.fixedDeltaTime));
+      UnityPlayerLoop.GetStream<FixedUpdate>().Add(deltaTime => {
+        tcs.SetResult(Mathf.Approximately(deltaTime, Time.fixedDeltaTime));
         cts.Release();
       }, cts.Token);
 
@@ -36,10 +38,16 @@ namespace Streams.Tests {
     [Test, Common]
     public async Task TemporaryUpdateTest() {
       var tcs = new TaskCompletionSource<bool>();
+      var cts = new StreamTokenSource();
 
-      UnityPlayerLoop.GetStream<Update>().Add(2, self => {
-        Debug.Log(self.DeltaTime);
-      }).SetDelta(0.5f).OnComplete(() => tcs.SetResult(true));
+      UnityPlayerLoop.GetStream<Update>().Add(deltaTime => {
+        Debug.Log(deltaTime);
+      }, cts.Token).SetDelta(0.5f);
+
+      UnityPlayerLoop.GetStream<Update>().AddDelayed(2, () => {
+        cts.Release();
+        tcs.SetResult(true);
+      });
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -48,9 +56,9 @@ namespace Streams.Tests {
     public async Task FixedUpdateTest() {
       var tcs = new TaskCompletionSource<bool>();
 
-      UnityPlayerLoop.GetStream<FixedUpdate>().Add(0.2f, self => {
-        Debug.Log(self.DeltaTime);
-      }).SetDelta(0.002f).OnComplete(() => tcs.SetResult(true));
+      ExecutionStream stream = UnityPlayerLoop.GetStream<FixedUpdate>();
+      stream.Add(deltaTime => Debug.Log(deltaTime), stream.CreateTokenTerminatedAfter(0.2f)).SetDelta(0.002f);
+      stream.AddDelayed(0.2f, () => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -58,38 +66,35 @@ namespace Streams.Tests {
     [Test, Common]
     public async Task ConditionalSleepTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var canRun = true;
 
-      UnityPlayerLoop.GetStream<Update>()
-        .Add(self => {
-          if (!canRun)
-            self.Sleep(() => canRun);
-          Debug.Log(self.DeltaTime);
-        })
-        .SetDelta(0.1f);
+      ExecutionStream stream = UnityPlayerLoop.GetStream<Update>();
+      IConfigurable action = stream.Add(deltaTime => Debug.Log(deltaTime)).SetDelta(0.1f);
 
-      UnityPlayerLoop.GetStream<Update>().AddTimer(2, () => canRun = false);
-      UnityPlayerLoop.GetStream<Update>().AddTimer(4, () => canRun = true);
-      UnityPlayerLoop.GetStream<Update>().AddTimer(6, () => tcs.SetResult(true));
+      stream.AddDelayed(2, () => {
+        StreamToken lockToken = stream.CreateTokenTerminatedAfter(2);
+        action.Lock(lockToken);
+        lockToken.Register(() => stream.AddDelayed(2, () => tcs.SetResult(true)));
+      });
+
       Assert.IsTrue(await tcs.Task);
     }
 
     [Test, Common]
     public async Task LockStreamTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var lockHandle = new StreamTokenSource();
       var disposeHandle = new StreamTokenSource();
 
       ExecutionStream baseStream = UnityPlayerLoop.GetStream<FixedUpdate>();
       var stream = new ManagedExecutionStream(baseStream);
       disposeHandle.Token.Register(stream.Dispose);
 
-      stream.Add(self => Debug.Log(self.DeltaTime))
-        .SetDelta(0.1f);
+      stream.Add(deltaTime => Debug.Log(deltaTime)).SetDelta(0.1f);
 
-      baseStream.AddTimer(2, () => stream.Lock(lockHandle.Token));
-      baseStream.AddTimer(4, () => lockHandle.Release());
-      baseStream.AddTimer(6, () => tcs.SetResult(true));
+      baseStream.AddDelayed(2, () => {
+        StreamToken lockHandle = baseStream.CreateTokenTerminatedAfter(2);
+        stream.Lock(lockHandle);
+        lockHandle.Register(() => baseStream.AddDelayed(2, () => tcs.SetResult(true)));
+      });
 
       Assert.IsTrue(await tcs.Task);
       disposeHandle.Release();
@@ -114,16 +119,16 @@ namespace Streams.Tests {
       var stream = new ManagedExecutionStream(baseStream);
       disposeHandle.Token.Register(stream.Dispose);
 
-      stream.Add(self => Debug.Log(self.DeltaTime))
+      stream.Add(deltaTime => Debug.Log(deltaTime))
         .SetDelta(0.1f);
 
-      baseStream.AddTimer(2, () => {
+      baseStream.AddDelayed(2, () => {
         stream.Lock(firstLockHandle.Token);
         stream.Lock(secondLockHandle.Token);
         stream.Lock(thirdLockHandle.Token);
       });
-      baseStream.AddTimer(4, () => lockHandle.Release());
-      baseStream.AddTimer(6, () => tcs.SetResult(true));
+      baseStream.AddDelayed(4, () => lockHandle.Release());
+      baseStream.AddDelayed(6, () => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);
       disposeHandle.Release();

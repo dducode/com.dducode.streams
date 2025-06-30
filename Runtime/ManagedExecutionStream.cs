@@ -84,12 +84,18 @@ namespace Streams {
       }
     }
 
+    public bool Locked => _lockers > 0;
+
     private uint _priority = uint.MaxValue;
     private float? _delta;
     private uint _tickRate = 1;
+
     private StreamTokenSource _subscriptionHandle;
     private ExecutionStream _baseStream;
-    private PersistentAction _execution;
+    private IConfigurable _execution;
+
+    private readonly Action _lockersDecrement;
+    private int _lockers;
 
     public ManagedExecutionStream(
       ExecutionStream baseStream,
@@ -97,8 +103,28 @@ namespace Streams {
     ) : base(name) {
       _subscriptionHandle = new StreamTokenSource();
       _baseStream = baseStream;
-      _execution = _baseStream.Add(self => Update(self.DeltaTime), _subscriptionHandle.Token).SetPriority(_priority);
+      _execution = _baseStream.Add(Update, _subscriptionHandle.Token).SetPriority(_priority);
       _baseStream.OnTerminate(Dispose, _subscriptionHandle.Token);
+      _lockersDecrement = () => _lockers--;
+    }
+
+    /// <summary>
+    /// Call this to lock the stream on a token
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Occurs when attempting to lock a stream inside its execution. Example:
+    /// <code>
+    /// stream.AddOnce(() => stream.Lock(token));
+    /// </code>
+    /// </exception>
+    /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
+    public void Lock(StreamToken lockToken) {
+      if (State == StreamState.Running)
+        throw new InvalidOperationException("Cannot lock a stream inside its execution");
+
+      ValidateStreamState();
+      _lockers++;
+      lockToken.Register(_lockersDecrement);
     }
 
     /// <summary>
@@ -134,7 +160,7 @@ namespace Streams {
       _subscriptionHandle = new StreamTokenSource();
 
       _baseStream = stream;
-      _execution = _baseStream.Add(self => Update(self.DeltaTime), _subscriptionHandle.Token).SetTickRate(_tickRate);
+      _execution = _baseStream.Add(Update, _subscriptionHandle.Token).SetTickRate(_tickRate);
       _baseStream.OnTerminate(Dispose, _subscriptionHandle.Token);
 
       if (_delta.HasValue)
@@ -161,6 +187,13 @@ namespace Streams {
       _subscriptionHandle = null;
       _execution = null;
       Terminate();
+    }
+
+    internal override void Update(float deltaTime) {
+      if (Locked)
+        return;
+
+      base.Update(deltaTime);
     }
 
   }
