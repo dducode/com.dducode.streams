@@ -17,7 +17,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task AsyncActionTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
 
       SetFailureAfterTime(2, tcs, cts.Token);
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
@@ -27,7 +27,6 @@ namespace Streams.Tests {
         await StreamTask.Delay(1000);
         Debug.Log(3);
         tcs.SetResult(true);
-        cts.Release();
       });
 
       Assert.IsTrue(await tcs.Task);
@@ -36,7 +35,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task WaitWhileTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
 
       SetFailureAfterTime(2, tcs, cts.Token);
       var flag = false;
@@ -52,7 +51,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task WhenAllTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       int firstDelay = Random.Range(100, 1000);
       int secondDelay = Random.Range(100, 1000);
       int thirdDelay = Random.Range(100, 1000);
@@ -64,7 +63,6 @@ namespace Streams.Tests {
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.WhenAll(StreamTask.Delay(firstDelay), StreamTask.Delay(secondDelay), StreamTask.Delay(thirdDelay));
         tcs.SetResult(true);
-        cts.Release();
       });
       Assert.IsTrue(await tcs.Task);
     }
@@ -72,7 +70,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task WhenAnyTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       int firstDelay = Random.Range(100, 1000);
       int secondDelay = Random.Range(100, 1000);
       int thirdDelay = Random.Range(100, 1000);
@@ -84,7 +82,6 @@ namespace Streams.Tests {
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.WhenAny(StreamTask.Delay(firstDelay), StreamTask.Delay(secondDelay), StreamTask.Delay(thirdDelay));
         tcs.SetResult(true);
-        cts.Release();
       });
 
       Assert.IsTrue(await tcs.Task);
@@ -93,11 +90,10 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task ContinuationTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       SetFailureAfterTime(2, tcs, cts.Token);
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.Delay(1000).ContinueWith(() => tcs.SetResult(true));
-        cts.Release();
       });
       Assert.IsTrue(await tcs.Task);
     }
@@ -105,13 +101,12 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task AsyncContinuationTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       SetFailureAfterTime(3, tcs, cts.Token);
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.Delay(1000).ContinueWith(async () => {
           await StreamTask.Delay(1000).ContinueWith(() => tcs.SetResult(true));
         });
-        cts.Release();
       });
       Assert.IsTrue(await tcs.Task);
     }
@@ -119,7 +114,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task NestedContinuationsTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       SetFailureAfterTime(6, tcs, cts.Token);
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.Delay(1000).ContinueWith(async () => {
@@ -127,7 +122,6 @@ namespace Streams.Tests {
             await StreamTask.Delay(1000);
           }).ContinueWith(async () => await StreamTask.Delay(1000));
         }).ContinueWith(async () => await StreamTask.Delay(1000)).ContinueWith(() => tcs.SetResult(true));
-        cts.Release();
       });
       Assert.IsTrue(await tcs.Task);
     }
@@ -135,7 +129,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task MultipleContinuationsTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       var tasks = new List<StreamTask>(5);
       SetFailureAfterTime(3, tcs, cts.Token);
 
@@ -149,7 +143,6 @@ namespace Streams.Tests {
 
         await StreamTask.WhenAll(tasks);
         tcs.SetResult(true);
-        cts.Release();
       });
 
       Assert.IsTrue(await tcs.Task);
@@ -158,7 +151,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task MultipleAsyncContinuationsTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       var tasks = new List<StreamTask>(5);
       SetFailureAfterTime(3, tcs, cts.Token);
 
@@ -177,7 +170,6 @@ namespace Streams.Tests {
 
         await StreamTask.WhenAll(tasks);
         tcs.SetResult(true);
-        cts.Release();
       });
 
       Assert.IsTrue(await tcs.Task);
@@ -187,8 +179,8 @@ namespace Streams.Tests {
     public async Task ImmediateCancellationTest() {
       var tcs = new TaskCompletionSource<bool>();
       var sts = new StreamTokenSource();
-      var cts = new StreamTokenSource();
-      SetFailureAfterTime(2, tcs, cts.Token);
+      using var disposingSource = new StreamTokenSource();
+      SetFailureAfterTime(2, tcs, disposingSource.Token);
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         try {
@@ -198,7 +190,6 @@ namespace Streams.Tests {
         }
         catch (OperationCanceledException) {
           tcs.SetResult(true);
-          cts.Release();
         }
       });
 
@@ -209,8 +200,8 @@ namespace Streams.Tests {
     public async Task DelayedCancellationTest() {
       var tcs = new TaskCompletionSource<bool>();
       var sts = new StreamTokenSource();
-      var cts = new StreamTokenSource();
-      SetFailureAfterTime(2, tcs, cts.Token);
+      using var disposingSource = new StreamTokenSource();
+      SetFailureAfterTime(2, tcs, disposingSource.Token);
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         try {
@@ -219,7 +210,6 @@ namespace Streams.Tests {
         }
         catch (OperationCanceledException) {
           tcs.SetResult(true);
-          cts.Release();
         }
       });
       UnityPlayerLoop.GetStream<Update>().AddDelayed(0.5f, () => sts.Release());
@@ -230,7 +220,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task ErrorInsideAsyncMethodTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       SetFailureAfterTime(2, tcs, cts.Token);
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
@@ -242,7 +232,6 @@ namespace Streams.Tests {
         catch (StreamsException exception) {
           Debug.Log($"StreamsException was thrown; message: <b>{exception.Message}</b>");
           tcs.SetResult(true);
-          cts.Release();
         }
       });
 
@@ -252,14 +241,13 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task ToStreamTaskTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       SetFailureAfterTime(2, tcs, cts.Token);
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await Task.Delay(500).ToStreamTask();
         await StreamTask.Delay(500);
         tcs.SetResult(true);
-        cts.Release();
       });
 
       Assert.IsTrue(await tcs.Task);
@@ -268,15 +256,12 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task AsyncOnCompleteTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       SetFailureAfterTime(1, tcs, cts.Token);
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         await StreamTask.Delay(500);
-      }).OnComplete(() => {
-        tcs.SetResult(true);
-        cts.Release();
-      });
+      }).OnComplete(() => tcs.SetResult(true));
 
       Assert.IsTrue(await tcs.Task);
     }
@@ -284,7 +269,7 @@ namespace Streams.Tests {
     [Test, StreamTasks]
     public async Task ContinueOnStreamTest() {
       var tcs = new TaskCompletionSource<bool>();
-      var cts = new StreamTokenSource();
+      using var cts = new StreamTokenSource();
       SetFailureAfterTime(1, tcs, cts.Token);
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
@@ -292,7 +277,6 @@ namespace Streams.Tests {
         await StreamTask.ContinueOnStream<FixedUpdate>();
         Debug.Log($"Run on stream {ExecutionStream.RunningStream}");
         tcs.SetResult(true);
-        cts.Release();
       });
 
       Assert.IsTrue(await tcs.Task);
