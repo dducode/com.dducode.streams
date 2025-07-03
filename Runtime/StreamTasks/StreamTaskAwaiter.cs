@@ -1,53 +1,57 @@
 using System;
 using System.Runtime.CompilerServices;
+using Streams.StreamTasks.TaskSources;
 
 namespace Streams.StreamTasks {
 
   public readonly struct StreamTaskAwaiter : ICriticalNotifyCompletion {
 
-    public bool IsCompleted => _task.IsCompleted;
-    private readonly StreamTask _task;
+    public bool IsCompleted => _source.GetStatus(_version) != StreamTaskStatus.Pending;
 
-    public StreamTaskAwaiter(StreamTask task) {
-      _task = task;
+    private readonly IStreamTaskSource _source;
+    private readonly short _version;
+
+    public StreamTaskAwaiter(IStreamTaskSource source, short version) {
+      _source = source;
+      _version = version;
     }
 
     public void OnCompleted(Action continuation) {
-      _task.ContinueWith(continuation);
+      _source.OnCompleted(continuation, _version);
     }
 
     public void UnsafeOnCompleted(Action continuation) {
-      _task.ContinueWith(continuation);
+      OnCompleted(continuation);
     }
 
     public void GetResult() {
-      if (_task.Error != null)
-        throw _task.Error;
+      _source.GetResult(_version);
     }
 
   }
 
   public readonly struct StreamTaskAwaiter<TResult> : ICriticalNotifyCompletion {
 
-    public bool IsCompleted => _task.IsCompleted;
-    private readonly StreamTask<TResult> _task;
+    public bool IsCompleted => _source.GetStatus(_version) != StreamTaskStatus.Pending;
 
-    public StreamTaskAwaiter(StreamTask<TResult> task) {
-      _task = task;
+    private readonly IStreamTaskSource<TResult> _source;
+    private readonly short _version;
+
+    public StreamTaskAwaiter(IStreamTaskSource<TResult> source, short version) {
+      _source = source;
+      _version = version;
     }
 
     public void OnCompleted(Action continuation) {
-      _task.ContinueWith(_ => continuation());
+      _source.OnCompleted(continuation, _version);
     }
 
     public void UnsafeOnCompleted(Action continuation) {
-      _task.ContinueWith(_ => continuation());
+      OnCompleted(continuation);
     }
 
     public TResult GetResult() {
-      if (_task.Error != null)
-        throw _task.Error;
-      return _task.Result;
+      return _source.GetResult(_version);
     }
 
   }

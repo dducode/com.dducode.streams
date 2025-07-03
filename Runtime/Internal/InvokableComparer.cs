@@ -4,9 +4,9 @@ using Streams.StreamActions;
 
 namespace Streams.Internal {
 
-  internal class StreamActionComparer : IComparer<StreamActionBase> {
+  internal class InvokableComparer : IComparer<IInvokable> {
 
-    public int Compare(StreamActionBase first, StreamActionBase second) {
+    public int Compare(IInvokable first, IInvokable second) {
       if (first == null || second == null)
         throw new StreamsException("Internal error was occurred while comparing - actions cannot be null");
 
@@ -22,7 +22,7 @@ namespace Streams.Internal {
         return 1;
       }
 
-      return first.Id.CompareTo(second.Id);
+      return 0;
     }
 
   }

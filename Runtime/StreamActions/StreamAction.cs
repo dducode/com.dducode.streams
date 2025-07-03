@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Streams.StreamActions {
 
-  public sealed class StreamAction : StreamActionBase, IConfigurable {
+  internal sealed class StreamAction : StreamActionBase, IConfigurable {
 
     public uint Priority {
       get => _priority;
@@ -16,7 +16,6 @@ namespace Streams.StreamActions {
 
     public event Action OnPriorityChanged;
 
-    private protected override Delegate Action => _action;
     private bool IsLocked => _lockers > 0;
     private readonly Configuration _configuration = new();
     private readonly Action<float> _action;
@@ -61,7 +60,7 @@ namespace Streams.StreamActions {
       lockToken.Register(_lockersDecrement);
     }
 
-    internal override void Invoke(float deltaTime) {
+    public override void Invoke(float deltaTime) {
       base.Invoke(deltaTime);
       if (IsLocked)
         return;

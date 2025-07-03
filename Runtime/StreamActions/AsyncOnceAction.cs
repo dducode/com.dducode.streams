@@ -4,15 +4,13 @@ using Streams.StreamTasks;
 
 namespace Streams.StreamActions {
 
-  public class AsyncOnceAction : StreamActionBase, ICompletable {
+  internal sealed class AsyncOnceAction : StreamActionBase, ICallbackCompletable {
 
     public bool IsCompleted => _completion.IsCompleted;
 
-    private protected override Delegate Action => _action;
-
     private readonly Func<StreamTask> _action;
     private readonly Completion _completion = new();
-    private StreamTask _task;
+    private StreamTask? _task;
 
     internal AsyncOnceAction(Func<StreamTask> action, StreamToken cancellationToken) : base(cancellationToken) {
       _action = action;
@@ -22,17 +20,15 @@ namespace Streams.StreamActions {
       _completion.OnComplete(onComplete, subscriptionToken);
     }
 
-    internal override void Invoke(float deltaTime) {
+    public override void Invoke(float deltaTime) {
       base.Invoke(deltaTime);
 
       _task ??= _action();
 
-      if (!_task.IsCompleted)
+      if (!_task.Value.GetAwaiter().IsCompleted)
         return;
 
-      if (_task.Error != null)
-        throw _task.Error;
-
+      _task.Value.GetAwaiter().GetResult();
       _completion.Complete();
     }
 

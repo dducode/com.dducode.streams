@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using JetBrains.Annotations;
 using Streams.Exceptions;
@@ -52,10 +51,10 @@ namespace Streams {
     private Action _delayedCallbacks;
 
     private readonly ActionsStorage _actionsStorage = new();
-    private readonly ActionsStorage _parallelActionsStorage = new();
+    private readonly ActionsStorage _parallelActionsStorage = new() { Sorted = false };
+    private readonly ActionsStorage _taskSourcesStorage = new() { Sorted = false };
 
-    private readonly ConcurrentQueue<Action> _continuations = new();
-    private readonly ConcurrentQueue<StreamTask> _waitedTasks = new();
+    private readonly ContinuationsHandler _continuationsHandler;
 
     private readonly ParallelActionsWorker _worker = new();
     private readonly Action<float, int> _handleParallelAction;
@@ -66,7 +65,9 @@ namespace Streams {
     internal ExecutionStream(string name) {
       _name = name;
       _profilerName = $"{_name} (stream)";
-      _handleParallelAction = HandleParallelAction;
+      _handleParallelAction = HandleParallelInvokable;
+      _continuationsHandler = new ContinuationsHandler(StreamToken.None);
+      _actionsStorage.Add(_continuationsHandler);
     }
 
     /// <summary>
@@ -91,7 +92,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public void Add([NotNull] Func<RestartableTask> action, StreamToken token = default) {
+    public void Add([NotNull] Func<CashedTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new AsyncAction(action, token);
@@ -120,7 +121,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public void AddConcurrent([NotNull] Func<RestartableTask> action, StreamToken token = default) {
+    public void AddConcurrent([NotNull] Func<CashedTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new AsyncAction(action, token);
@@ -134,7 +135,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public ICompletable AddOnce([NotNull] Action action, StreamToken token = default) {
+    public ICallbackCompletable AddOnce([NotNull] Action action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new OnceAction(action, token);
@@ -149,7 +150,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public ICompletable AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
+    public ICallbackCompletable AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
       var streamAction = new AsyncOnceAction(action, token);
@@ -168,7 +169,7 @@ namespace Streams {
     /// <remarks> It is worth distinguishing a timer from a temporary action.
     /// A temporary action is executed every tick of the stream for a specified time,
     /// and a timer executes the action once after the time has elapsed. </remarks>
-    public ICompletable AddDelayed(float time, [NotNull] Action action, StreamToken token = default) {
+    public ICallbackCompletable AddDelayed(float time, [NotNull] Action action, StreamToken token = default) {
       if (time <= 0)
         throw new ArgumentOutOfRangeException(nameof(time), $"Time is negative or zero: {time}");
 
@@ -207,6 +208,7 @@ namespace Streams {
     protected void CopyFrom(ExecutionStream other) {
       _actionsStorage.CopyFrom(other._actionsStorage);
       _parallelActionsStorage.CopyFrom(other._parallelActionsStorage);
+      _taskSourcesStorage.CopyFrom(other._taskSourcesStorage);
       _delayedCallbacks += other._delayedCallbacks;
       _terminateCallbacks += other._terminateCallbacks;
     }
@@ -216,22 +218,21 @@ namespace Streams {
         throw new StreamDisposedException(ToString());
     }
 
-    internal void ScheduleContinuation(Action continuation) {
+    internal void AddInvokableTaskSource(IInvokable invokable) {
       ValidateStreamState();
-      _continuations.Enqueue(continuation);
+      _taskSourcesStorage.Add(invokable);
     }
 
-    internal void ScheduleTaskCompletion(StreamTask task) {
+    internal void ScheduleContinuation(Action continuation) {
       ValidateStreamState();
-      _waitedTasks.Enqueue(task);
+      _continuationsHandler.Enqueue(continuation);
     }
 
     internal virtual void Update(float deltaTime) {
       ValidateExecution();
       _actionsStorage.Refresh();
       _parallelActionsStorage.Refresh();
-      if (!HasWork())
-        return;
+      _taskSourcesStorage.Refresh();
 
       try {
         Execute(deltaTime);
@@ -260,10 +261,6 @@ namespace Streams {
       State = StreamState.Terminated;
     }
 
-    private bool HasWork() {
-      return _actionsStorage.Count != 0 || _parallelActionsStorage.Count != 0 || _waitedTasks.Count != 0 || _continuations.Count != 0;
-    }
-
     private void ValidateExecution() {
       switch (State) {
         case StreamState.Terminating or StreamState.Terminated:
@@ -289,9 +286,10 @@ namespace Streams {
 
       _worker.Start(deltaTime, _parallelActionsStorage.Count, WorkStrategy, _handleParallelAction);
 
-      PrepareCompletions();
+      for (var i = 0; i < _taskSourcesStorage.Count; i++)
+        HandleInvokable(deltaTime, _taskSourcesStorage, i);
       for (var i = 0; i < _actionsStorage.Count; i++)
-        HandleAction(deltaTime, _actionsStorage, i);
+        HandleInvokable(deltaTime, _actionsStorage, i);
 
       _worker.Wait();
 
@@ -300,33 +298,25 @@ namespace Streams {
       State = StreamState.Idle;
     }
 
-    private void PrepareCompletions() {
-      while (_continuations.TryDequeue(out Action continuation))
-        continuation();
-
-      while (_waitedTasks.TryDequeue(out StreamTask task))
-        task.SetResult();
+    private void HandleParallelInvokable(float deltaTime, int index) {
+      HandleInvokable(deltaTime, _parallelActionsStorage, index);
     }
 
-    private void HandleParallelAction(float deltaTime, int index) {
-      HandleAction(deltaTime, _parallelActionsStorage, index);
-    }
-
-    private void HandleAction(float deltaTime, ActionsStorage storage, int index) {
-      StreamActionBase action = storage[index];
+    private void HandleInvokable(float deltaTime, ActionsStorage storage, int index) {
+      IInvokable invokable = storage[index];
 
       try {
-        action.Invoke(deltaTime);
-        if (action is ICompletable { IsCompleted: true })
-          storage.Remove(action);
+        invokable.Invoke(deltaTime);
+        if (invokable is ICompletable { IsCompleted: true })
+          storage.Remove(invokable);
       }
       catch (ActionCanceledException) {
-        storage.Remove(action);
+        storage.Remove(invokable);
       }
       catch (Exception exception) {
-        Debug.LogError($"An error occured while executing action <b>{action}</b>");
+        Debug.LogError($"An error occured while executing action <b>{invokable}</b>");
         Debug.LogException(exception);
-        storage.Remove(action);
+        storage.Remove(invokable);
       }
     }
 

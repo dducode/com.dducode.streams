@@ -1,0 +1,8 @@
+{
+  "name": "dducode.Streams.UniTasks",
+  "rootNamespace": "Streams.UniTasks",
+  "references": [
+    "GUID:c7b9315b3bb06e74cb9eeda4676457f5",
+    "GUID:f51ebe6a0ceec4240a699833d6309b23"
+  ]
+}

@@ -1,8 +1,6 @@
-using System;
-
 namespace Streams.StreamActions {
 
-  public abstract class StreamActionBase {
+  internal abstract class StreamActionBase : IInvokable {
 
     private static int NextId => ++_nextId;
     private static int _nextId = -1;
@@ -10,9 +8,6 @@ namespace Streams.StreamActions {
     public string Name { get; }
     internal int Id { get; } = NextId;
 
-    private protected abstract Delegate Action { get; }
-
-    private string ActionName => Action.Method.Name;
     private bool _cancellationRequested;
 
     private protected StreamActionBase(StreamToken cancellationToken) {
@@ -21,10 +16,10 @@ namespace Streams.StreamActions {
     }
 
     public override string ToString() {
-      return $"{Name} ({ActionName})";
+      return Name;
     }
 
-    internal virtual void Invoke(float deltaTime) {
+    public virtual void Invoke(float deltaTime) {
       if (_cancellationRequested)
         throw new ActionCanceledException();
     }

@@ -7,7 +7,7 @@ namespace Streams.StreamTasks.Internal {
   [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
   public struct RestartableTaskMethodBuilder {
 
-    public RestartableTask Task { get; private set; }
+    public CashedTask Task { get; private set; }
     private IAsyncStateMachineRunner StateMachineRunner { get; set; }
     private Action _stateMachineMoveNext;
 
@@ -17,7 +17,7 @@ namespace Streams.StreamTasks.Internal {
 
     public void Start<TStateMachine>(ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine {
       stateMachine.MoveNext();
-      Task = new RestartableTask { StateMachine = stateMachine };
+      Task = new CashedTask { StateMachine = stateMachine };
     }
 
     public void SetStateMachine(IAsyncStateMachine stateMachine) {

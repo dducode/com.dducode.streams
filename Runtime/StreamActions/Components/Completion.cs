@@ -2,7 +2,7 @@ using System;
 
 namespace Streams.StreamActions.Components {
 
-  internal class Completion : ICompletable {
+  internal class Completion : ICallbackCompletable {
 
     public bool IsCompleted { get; private set; }
 
