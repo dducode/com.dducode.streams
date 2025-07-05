@@ -1,12 +1,11 @@
 #if STREAMS_UNITASK_INTEGRATION
 using System;
 using Cysharp.Threading.Tasks;
-using Streams.StreamTasks;
 using Streams.StreamTasks.TaskSources;
 
 namespace Streams.UniTasks {
 
-  public class UniTaskContinuationSource : RunnableTaskSource<UniTask> {
+  internal class UniTaskContinuationSource : RunnableTaskSource<UniTask> {
 
     private UniTask _parentTask;
 
@@ -14,17 +13,9 @@ namespace Streams.UniTasks {
       _parentTask = value;
     }
 
-    public override void Invoke(float deltaTime) {
-      if (IsCompleted)
-        return;
-
-      if (CancellationToken.Released) {
-        SetCanceled();
-        return;
-      }
-
+    public override bool Invoke(float deltaTime) {
       if (_parentTask.Status == UniTaskStatus.Pending)
-        return;
+        return true;
 
       try {
         _parentTask.GetAwaiter().GetResult();
@@ -36,16 +27,18 @@ namespace Streams.UniTasks {
       catch (Exception e) {
         SetException(e);
       }
+
+      return false;
     }
 
-    public override void Reset() {
+    private protected override void Reset() {
       base.Reset();
       _parentTask = UniTask.CompletedTask;
     }
 
   }
 
-  public class UniTaskContinuationSource<TResult> : RunnableTaskSource<UniTask<TResult>, TResult> {
+  internal class UniTaskContinuationSource<TResult> : RunnableTaskSource<UniTask<TResult>, TResult> {
 
     private UniTask<TResult> _parentTask;
 
@@ -53,17 +46,9 @@ namespace Streams.UniTasks {
       _parentTask = value;
     }
 
-    public override void Invoke(float deltaTime) {
-      if (IsCompleted)
-        return;
-
-      if (CancellationToken.Released) {
-        SetCanceled();
-        return;
-      }
-
+    public override bool Invoke(float deltaTime) {
       if (_parentTask.Status == UniTaskStatus.Pending)
-        return;
+        return true;
 
       try {
         SetResult(_parentTask.GetAwaiter().GetResult());
@@ -74,9 +59,11 @@ namespace Streams.UniTasks {
       catch (Exception e) {
         SetException(e);
       }
+
+      return false;
     }
 
-    public override void Reset() {
+    private protected override void Reset() {
       base.Reset();
       _parentTask = UniTask.FromResult(default(TResult));
     }

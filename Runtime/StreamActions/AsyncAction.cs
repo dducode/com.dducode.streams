@@ -3,7 +3,7 @@ using Streams.StreamTasks.Internal;
 
 namespace Streams.StreamActions {
 
-  internal sealed class AsyncAction : StreamActionBase {
+  internal sealed class AsyncAction : StreamActionBase, IInitializable {
 
     private readonly Func<CashedTask> _action;
     private CashedTask _task;
@@ -12,13 +12,18 @@ namespace Streams.StreamActions {
       _action = action;
     }
 
-    public override void Invoke(float deltaTime) {
-      base.Invoke(deltaTime);
+    public void Initialize() {
+      _task = _action();
+    }
 
-      _task ??= _action();
+    public override bool Invoke(float deltaTime) {
+      if (!base.Invoke(deltaTime))
+        return false;
 
       if (_task.IsCompleted)
         _task.Restart();
+
+      return true;
     }
 
   }

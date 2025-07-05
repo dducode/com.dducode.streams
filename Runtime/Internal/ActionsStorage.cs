@@ -5,7 +5,7 @@ using Streams.StreamActions;
 
 namespace Streams.Internal {
 
-  internal sealed class ActionsStorage : IEnumerable<IInvokable> {
+  internal sealed class ActionsStorage : IEnumerable<IInvokable>, IDisposable {
 
     public int Count => _actions.Count;
     public bool Sorted { get; set; } = true;
@@ -68,12 +68,6 @@ namespace Streams.Internal {
       return GetEnumerator();
     }
 
-    public void Clear() {
-      _actions.Clear();
-      _pendingAddActions.Clear();
-      _pendingRemoveActions.Clear();
-    }
-
     private void ApplyChanges() {
       while (_pendingAddActions.TryDequeue(out IInvokable invokable)) {
         _actions.Add(invokable);
@@ -84,6 +78,12 @@ namespace Streams.Internal {
         _actions.Remove(invokable);
         _dirty = true;
       }
+    }
+
+    public void Dispose() {
+      _actions.Clear();
+      _pendingAddActions.Clear();
+      _pendingRemoveActions.Clear();
     }
 
     public struct Enumerator : IEnumerator<IInvokable> {

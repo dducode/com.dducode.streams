@@ -5,7 +5,7 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace Streams.Addressables {
 
-  public class AsyncOperationHandleTaskSource<TResult> : RunnableTaskSource<AsyncOperationHandle<TResult>, TResult> {
+  internal class AsyncOperationHandleTaskSource<TResult> : RunnableTaskSource<AsyncOperationHandle<TResult>, TResult> {
 
     private AsyncOperationHandle<TResult> _handle;
 
@@ -13,30 +13,27 @@ namespace Streams.Addressables {
       _handle = value;
     }
 
-    public override void Invoke(float deltaTime) {
-      if (IsCompleted)
-        return;
-
-      if (CancellationToken.Released) {
-        SetCanceled();
-        return;
-      }
+    public override bool Invoke(float deltaTime) {
+      if (!base.Invoke(deltaTime))
+        return false;
 
       if (!_handle.IsDone)
-        return;
+        return true;
 
-      try {
+      if (_handle.OperationException != null) {
+        if (_handle.OperationException is OperationCanceledException)
+          SetCanceled();
+        else
+          SetException(_handle.OperationException);
+      }
+      else {
         SetResult(_handle.Result);
       }
-      catch (OperationCanceledException) {
-        SetCanceled();
-      }
-      catch (Exception e) {
-        SetException(e);
-      }
+
+      return false;
     }
 
-    public override void Reset() {
+    private protected override void Reset() {
       base.Reset();
       _handle = default;
     }

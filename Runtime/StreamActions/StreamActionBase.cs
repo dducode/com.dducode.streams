@@ -19,9 +19,8 @@ namespace Streams.StreamActions {
       return Name;
     }
 
-    public virtual void Invoke(float deltaTime) {
-      if (_cancellationRequested)
-        throw new ActionCanceledException();
+    public virtual bool Invoke(float deltaTime) {
+      return !_cancellationRequested;
     }
 
   }

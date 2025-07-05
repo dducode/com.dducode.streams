@@ -2,11 +2,10 @@ using System;
 
 namespace Streams.StreamActions.Components {
 
-  internal class Completion : ICallbackCompletable {
-
-    public bool IsCompleted { get; private set; }
+  internal class Completion : ICompletable {
 
     private Action _completeCallbacks;
+    private bool _isCompleted;
 
     public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
       if (onComplete == null)
@@ -15,7 +14,7 @@ namespace Streams.StreamActions.Components {
       if (subscriptionToken.Released)
         return;
 
-      if (IsCompleted) {
+      if (_isCompleted) {
         onComplete();
         return;
       }
@@ -25,14 +24,14 @@ namespace Streams.StreamActions.Components {
     }
 
     public void Complete() {
-      if (IsCompleted)
+      if (_isCompleted)
         return;
 
       try {
         _completeCallbacks?.Invoke();
       }
       finally {
-        IsCompleted = true;
+        _isCompleted = true;
         _completeCallbacks = null;
       }
     }

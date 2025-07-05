@@ -50,11 +50,14 @@ namespace Streams {
     private Action _terminateCallbacks;
     private Action _delayedCallbacks;
 
+    private readonly List<ActionsStorage> _allStorages;
+    private readonly List<IDisposable> _disposables;
     private readonly ActionsStorage _actionsStorage = new();
     private readonly ActionsStorage _parallelActionsStorage = new() { Sorted = false };
     private readonly ActionsStorage _taskSourcesStorage = new() { Sorted = false };
 
-    private readonly ContinuationsHandler _continuationsHandler;
+    private ContinuationsHandler _continuationsHandler;
+    private Initializer _initializer;
 
     private readonly ParallelActionsWorker _worker = new();
     private readonly Action<float, int> _handleParallelAction;
@@ -66,8 +69,12 @@ namespace Streams {
       _name = name;
       _profilerName = $"{_name} (stream)";
       _handleParallelAction = HandleParallelInvokable;
-      _continuationsHandler = new ContinuationsHandler(StreamToken.None);
-      _actionsStorage.Add(_continuationsHandler);
+      _allStorages = new List<ActionsStorage>(new[] {
+        _actionsStorage, _parallelActionsStorage, _taskSourcesStorage
+      });
+      _disposables = new List<IDisposable>(new[] {
+        _actionsStorage, _parallelActionsStorage, _taskSourcesStorage
+      });
     }
 
     /// <summary>
@@ -95,8 +102,9 @@ namespace Streams {
     public void Add([NotNull] Func<CashedTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
-      var streamAction = new AsyncAction(action, token);
-      _actionsStorage.Add(streamAction);
+      var asyncAction = new AsyncAction(action, token);
+      ScheduleInitializable(asyncAction);
+      _actionsStorage.Add(asyncAction);
     }
 
     /// <summary>
@@ -124,8 +132,9 @@ namespace Streams {
     public void AddConcurrent([NotNull] Func<CashedTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
-      var streamAction = new AsyncAction(action, token);
-      _parallelActionsStorage.Add(streamAction);
+      var asyncAction = new AsyncAction(action, token);
+      ScheduleInitializable(asyncAction);
+      _parallelActionsStorage.Add(asyncAction);
     }
 
     /// <summary>
@@ -135,12 +144,12 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public ICallbackCompletable AddOnce([NotNull] Action action, StreamToken token = default) {
+    public ICompletable AddOnce([NotNull] Action action, StreamToken token = default) {
       ValidateAddAction(action);
 
-      var streamAction = new OnceAction(action, token);
-      _actionsStorage.Add(streamAction);
-      return streamAction;
+      var onceAction = new OnceAction(action, token);
+      _actionsStorage.Add(onceAction);
+      return onceAction;
     }
 
     /// <summary>
@@ -150,12 +159,13 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public ICallbackCompletable AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
+    public ICompletable AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAddAction(action);
 
-      var streamAction = new AsyncOnceAction(action, token);
-      _actionsStorage.Add(streamAction);
-      return streamAction;
+      var asyncOnceAction = new AsyncOnceAction(action, token);
+      ScheduleInitializable(asyncOnceAction);
+      _actionsStorage.Add(asyncOnceAction);
+      return asyncOnceAction;
     }
 
     /// <summary>
@@ -169,15 +179,15 @@ namespace Streams {
     /// <remarks> It is worth distinguishing a timer from a temporary action.
     /// A temporary action is executed every tick of the stream for a specified time,
     /// and a timer executes the action once after the time has elapsed. </remarks>
-    public ICallbackCompletable AddDelayed(float time, [NotNull] Action action, StreamToken token = default) {
-      if (time <= 0)
-        throw new ArgumentOutOfRangeException(nameof(time), $"Time is negative or zero: {time}");
+    public ICompletable AddDelayed(float time, [NotNull] Action action, StreamToken token = default) {
+      if (time < 0)
+        throw new ArgumentOutOfRangeException(nameof(time), $"Time is negative: {time}");
 
       ValidateAddAction(action);
 
-      var streamAction = new DelayedAction(time, action, token);
-      _actionsStorage.Add(streamAction);
-      return streamAction;
+      var delayedAction = new DelayedAction(time, action, token);
+      _actionsStorage.Add(delayedAction);
+      return delayedAction;
     }
 
     /// <summary>
@@ -209,6 +219,10 @@ namespace Streams {
       _actionsStorage.CopyFrom(other._actionsStorage);
       _parallelActionsStorage.CopyFrom(other._parallelActionsStorage);
       _taskSourcesStorage.CopyFrom(other._taskSourcesStorage);
+
+      _initializer.CopyFrom(other._initializer);
+      _continuationsHandler.CopyFrom(other._continuationsHandler);
+
       _delayedCallbacks += other._delayedCallbacks;
       _terminateCallbacks += other._terminateCallbacks;
     }
@@ -225,14 +239,17 @@ namespace Streams {
 
     internal void ScheduleContinuation(Action continuation) {
       ValidateStreamState();
+      if (_continuationsHandler == null) {
+        _continuationsHandler = new ContinuationsHandler(StreamToken.None);
+        _actionsStorage.Add(_continuationsHandler);
+        _disposables.Add(_continuationsHandler);
+      }
+
       _continuationsHandler.Enqueue(continuation);
     }
 
     internal virtual void Update(float deltaTime) {
       ValidateExecution();
-      _actionsStorage.Refresh();
-      _parallelActionsStorage.Refresh();
-      _taskSourcesStorage.Refresh();
 
       try {
         Execute(deltaTime);
@@ -253,12 +270,26 @@ namespace Streams {
       }
 
       State = StreamState.Terminating;
-      _actionsStorage.Clear();
-      _parallelActionsStorage.Clear();
+      foreach (IDisposable disposable in _disposables)
+        disposable.Dispose();
+
+      _allStorages.Clear();
+      _disposables.Clear();
+
       _terminateCallbacks?.Invoke();
       _terminateCallbacks = null;
       _delayedCallbacks = null;
       State = StreamState.Terminated;
+    }
+
+    private void ScheduleInitializable(IInitializable initializable) {
+      ValidateStreamState();
+      if (_initializer == null) {
+        _initializer = new Initializer(StreamToken.None);
+        _disposables.Add(_initializer);
+      }
+
+      _initializer.Enqueue(initializable);
     }
 
     private void ValidateExecution() {
@@ -284,6 +315,16 @@ namespace Streams {
       _streamsStack.Push(this);
       Profiler.BeginSample(_profilerName);
 
+      _initializer.Invoke(deltaTime);
+
+      while (_initializer.corruptedObjects.TryDequeue(out IInitializable corrupted))
+        if (corrupted is IInvokable invokable)
+          foreach (ActionsStorage storage in _allStorages)
+            storage.Remove(invokable);
+
+      foreach (ActionsStorage storage in _allStorages)
+        storage.Refresh();
+
       _worker.Start(deltaTime, _parallelActionsStorage.Count, WorkStrategy, _handleParallelAction);
 
       for (var i = 0; i < _taskSourcesStorage.Count; i++)
@@ -306,12 +347,8 @@ namespace Streams {
       IInvokable invokable = storage[index];
 
       try {
-        invokable.Invoke(deltaTime);
-        if (invokable is ICompletable { IsCompleted: true })
+        if (!invokable.Invoke(deltaTime))
           storage.Remove(invokable);
-      }
-      catch (ActionCanceledException) {
-        storage.Remove(invokable);
       }
       catch (Exception exception) {
         Debug.LogError($"An error occured while executing action <b>{invokable}</b>");

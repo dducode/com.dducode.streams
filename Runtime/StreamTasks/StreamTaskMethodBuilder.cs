@@ -30,12 +30,7 @@ namespace Streams.StreamTasks {
     public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : INotifyCompletion
       where TStateMachine : IAsyncStateMachine {
-      if (_source == null) {
-        if (!TaskSourcePool.TryGet(out StreamTaskSource source))
-          source = new StreamTaskSource();
-        _source = source;
-      }
-
+      _source ??= TaskSourcePool.Get<StreamTaskSource>();
       _stateMachineMoveNext ??= stateMachine.MoveNext;
       awaiter.OnCompleted(_stateMachineMoveNext);
     }
@@ -43,12 +38,7 @@ namespace Streams.StreamTasks {
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : ICriticalNotifyCompletion
       where TStateMachine : IAsyncStateMachine {
-      if (_source == null) {
-        if (!TaskSourcePool.TryGet(out StreamTaskSource source))
-          source = new StreamTaskSource();
-        _source = source;
-      }
-
+      _source ??= TaskSourcePool.Get<StreamTaskSource>();
       _stateMachineMoveNext ??= stateMachine.MoveNext;
       awaiter.UnsafeOnCompleted(_stateMachineMoveNext);
     }
@@ -63,14 +53,14 @@ namespace Streams.StreamTasks {
   }
 
   [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-  public struct ValueStreamTaskMethodBuilder<TResult> {
+  public struct StreamTaskMethodBuilder<TResult> {
 
     public StreamTask<TResult> Task => _source.Task;
     private StreamTaskSource<TResult> _source;
     private Action _stateMachineMoveNext;
 
-    public static ValueStreamTaskMethodBuilder<TResult> Create() {
-      return new ValueStreamTaskMethodBuilder<TResult>();
+    public static StreamTaskMethodBuilder<TResult> Create() {
+      return new StreamTaskMethodBuilder<TResult>();
     }
 
     public void Start<TStateMachine>(ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine {
@@ -81,24 +71,14 @@ namespace Streams.StreamTasks {
     }
 
     public void SetResult(TResult result) {
-      if (_source == null) {
-        if (!TaskSourcePool.TryGet(out StreamTaskSource<TResult> source))
-          source = new StreamTaskSource<TResult>();
-        _source = source;
-      }
-
+      _source ??= TaskSourcePool.Get<StreamTaskSource<TResult>>();
       _source.SetResult(result);
     }
 
     public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : INotifyCompletion
       where TStateMachine : IAsyncStateMachine {
-      if (_source == null) {
-        if (!TaskSourcePool.TryGet(out StreamTaskSource<TResult> source))
-          source = new StreamTaskSource<TResult>();
-        _source = source;
-      }
-
+      _source ??= TaskSourcePool.Get<StreamTaskSource<TResult>>();
       _stateMachineMoveNext ??= stateMachine.MoveNext;
       awaiter.OnCompleted(_stateMachineMoveNext);
     }
@@ -106,12 +86,7 @@ namespace Streams.StreamTasks {
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : ICriticalNotifyCompletion
       where TStateMachine : IAsyncStateMachine {
-      if (_source == null) {
-        if (!TaskSourcePool.TryGet(out StreamTaskSource<TResult> source))
-          source = new StreamTaskSource<TResult>();
-        _source = source;
-      }
-
+      _source ??= TaskSourcePool.Get<StreamTaskSource<TResult>>();
       _stateMachineMoveNext ??= stateMachine.MoveNext;
       awaiter.UnsafeOnCompleted(_stateMachineMoveNext);
     }

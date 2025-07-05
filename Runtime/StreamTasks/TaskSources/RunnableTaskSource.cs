@@ -2,19 +2,39 @@ using Streams.StreamActions;
 
 namespace Streams.StreamTasks.TaskSources {
 
-  public abstract class RunnableTaskSource<TValue> : StreamTaskSource, IInvokable, ICompletable {
+  internal abstract class RunnableTaskSource<TValue> : StreamTaskSource, IInvokable {
 
-    public bool IsCompleted => Status != StreamTaskStatus.Pending;
+    private protected RunnableTaskSource() {
+    }
+
     public abstract void Setup(TValue value);
-    public abstract void Invoke(float deltaTime);
+
+    public virtual bool Invoke(float deltaTime) {
+      if (CancellationToken.Released) {
+        SetCanceled();
+        return false;
+      }
+
+      return true;
+    }
 
   }
 
-  public abstract class RunnableTaskSource<TValue, TResult> : StreamTaskSource<TResult>, IInvokable, ICompletable {
+  internal abstract class RunnableTaskSource<TValue, TResult> : StreamTaskSource<TResult>, IInvokable {
 
-    public bool IsCompleted => Status != StreamTaskStatus.Pending;
+    private protected RunnableTaskSource() {
+    }
+
     public abstract void Setup(TValue value);
-    public abstract void Invoke(float deltaTime);
+
+    public virtual bool Invoke(float deltaTime) {
+      if (CancellationToken.Released) {
+        SetCanceled();
+        return false;
+      }
+
+      return true;
+    }
 
   }
 

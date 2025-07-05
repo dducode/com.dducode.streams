@@ -11,17 +11,9 @@ namespace Streams.StreamTasks.TaskSources {
       _parentTask = value;
     }
 
-    public override void Invoke(float deltaTime) {
-      if (IsCompleted)
-        return;
-
-      if (CancellationToken.Released) {
-        SetCanceled();
-        return;
-      }
-
+    public override bool Invoke(float deltaTime) {
       if (!_parentTask.IsCompleted)
-        return;
+        return true;
 
       try {
         _parentTask.GetAwaiter().GetResult();
@@ -33,9 +25,11 @@ namespace Streams.StreamTasks.TaskSources {
       catch (Exception exception) {
         SetException(exception);
       }
+
+      return false;
     }
 
-    public override void Reset() {
+    private protected override void Reset() {
       base.Reset();
       _parentTask = null;
     }
@@ -50,17 +44,9 @@ namespace Streams.StreamTasks.TaskSources {
       _parentTask = value;
     }
 
-    public override void Invoke(float deltaTime) {
-      if (IsCompleted)
-        return;
-
-      if (CancellationToken.Released) {
-        SetCanceled();
-        return;
-      }
-
+    public override bool Invoke(float deltaTime) {
       if (!_parentTask.IsCompleted)
-        return;
+        return true;
 
       try {
         SetResult(_parentTask.GetAwaiter().GetResult());
@@ -71,9 +57,11 @@ namespace Streams.StreamTasks.TaskSources {
       catch (Exception exception) {
         SetException(exception);
       }
+
+      return false;
     }
 
-    public override void Reset() {
+    private protected override void Reset() {
       base.Reset();
       _parentTask = null;
     }

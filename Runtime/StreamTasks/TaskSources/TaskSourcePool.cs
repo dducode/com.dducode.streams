@@ -1,36 +1,29 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace Streams.StreamTasks.TaskSources {
 
   internal static class TaskSourcePool {
 
-    private static readonly Dictionary<Type, Queue<IStreamTaskSource>> _pool = new();
+    private static readonly Dictionary<Type, Stack<IStreamTaskSource>> _pool = new();
+    private static readonly object _poolLock = new();
 
-    internal static bool TryGet<TSource>(out TSource source) where TSource : class, IStreamTaskSource {
-      if (_pool.TryGetValue(typeof(TSource), out Queue<IStreamTaskSource> queue)) {
-        if (queue.TryDequeue(out IStreamTaskSource result)) {
-          source = (TSource)result;
-          source.Reset();
-          return true;
-        }
-      }
+    internal static TSource Get<TSource>() where TSource : class, IStreamTaskSource, new() {
+      lock (_poolLock)
+        if (_pool.TryGetValue(typeof(TSource), out Stack<IStreamTaskSource> stack))
+          if (stack.TryPop(out IStreamTaskSource source))
+            return (TSource)source;
 
-      source = null;
-      return false;
+      return new TSource();
     }
 
     internal static void Return(IStreamTaskSource source) {
       Type sourceType = source.GetType();
-      if (!_pool.ContainsKey(sourceType))
-        _pool.Add(sourceType, new Queue<IStreamTaskSource>());
-      _pool[sourceType].Enqueue(source);
-    }
-
-    [RuntimeInitializeOnLoadMethod]
-    private static void Initialize() {
-      _pool.Clear();
+      lock (_poolLock) {
+        if (!_pool.ContainsKey(sourceType))
+          _pool.Add(sourceType, new Stack<IStreamTaskSource>());
+        _pool[sourceType].Push(source);
+      }
     }
 
   }

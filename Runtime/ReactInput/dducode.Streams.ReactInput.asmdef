@@ -1,0 +1,8 @@
+{
+  "name": "dducode.Streams.ReactInput",
+  "rootNamespace": "Streams.ReactInput",
+  "references": [
+    "GUID:c7b9315b3bb06e74cb9eeda4676457f5",
+    "GUID:75469ad4d38634e559750d17036d5f7c"
+  ]
+}

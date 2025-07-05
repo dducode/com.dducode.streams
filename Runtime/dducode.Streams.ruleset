@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RuleSet Name="Disable Streams Code Analysis" Description=" " ToolsVersion="10.0">
+    <Rules AnalyzerId="streams-code-analyzer" RuleNamespace="StreamsCodeAnalysis">
+        <Rule Id="ST0001" Action="None"/>
+    </Rules>
+</RuleSet>

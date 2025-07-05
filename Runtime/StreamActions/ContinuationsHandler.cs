@@ -4,10 +4,9 @@ using UnityEngine;
 
 namespace Streams.StreamActions {
 
-  internal sealed class ContinuationsHandler : StreamActionBase {
+  internal sealed class ContinuationsHandler : StreamActionBase, IDisposable {
 
     private readonly Queue<Action> _continuations = new();
-    private readonly List<(float time, Action continuation)> _delayedContinuations = new();
     private readonly object _lock = new();
 
     internal ContinuationsHandler(StreamToken cancellationToken) : base(cancellationToken) {
@@ -18,22 +17,30 @@ namespace Streams.StreamActions {
         _continuations.Enqueue(continuation);
     }
 
-    internal void Enqueue(float time, Action continuation) {
-      lock (_lock)
-        _delayedContinuations.Add((Time.time + time, continuation));
+    internal void CopyFrom(ContinuationsHandler other) {
+      foreach (Action continuation in other._continuations)
+        lock (_lock)
+          _continuations.Enqueue(continuation);
     }
 
-    public override void Invoke(float deltaTime) {
-      base.Invoke(deltaTime);
+    public override bool Invoke(float deltaTime) {
+      lock (_lock) {
+        while (_continuations.TryDequeue(out Action continuation)) {
+          try {
+            continuation();
+          }
+          catch (Exception e) {
+            Debug.LogError($"An error occurred while executing continuation of declaring type <b>{continuation.Target.GetType()}</b>");
+            Debug.LogException(e);
+          }
+        }
+      }
 
-      while (_continuations.TryDequeue(out Action continuation))
-        continuation();
+      return true;
+    }
 
-      foreach ((float time, Action continuation) pair in _delayedContinuations)
-        if (Time.time > pair.time)
-          pair.continuation();
-
-      _delayedContinuations.RemoveAll(pair => Time.time > pair.time);
+    public void Dispose() {
+      _continuations.Clear();
     }
 
   }

@@ -6,12 +6,18 @@ namespace Streams.StreamTasks {
 
   public readonly struct StreamTaskAwaiter : ICriticalNotifyCompletion {
 
-    public bool IsCompleted => _source.GetStatus(_version) != StreamTaskStatus.Pending;
+    public bool IsCompleted {
+      get {
+        if (_source == null)
+          return true;
+        return _source.GetStatus(_version) != StreamTaskStatus.Pending;
+      }
+    }
 
     private readonly IStreamTaskSource _source;
     private readonly short _version;
 
-    public StreamTaskAwaiter(IStreamTaskSource source, short version) {
+    internal StreamTaskAwaiter(IStreamTaskSource source, short version) {
       _source = source;
       _version = version;
     }
@@ -25,7 +31,7 @@ namespace Streams.StreamTasks {
     }
 
     public void GetResult() {
-      _source.GetResult(_version);
+      _source?.GetResult(_version);
     }
 
   }
@@ -37,7 +43,7 @@ namespace Streams.StreamTasks {
     private readonly IStreamTaskSource<TResult> _source;
     private readonly short _version;
 
-    public StreamTaskAwaiter(IStreamTaskSource<TResult> source, short version) {
+    internal StreamTaskAwaiter(IStreamTaskSource<TResult> source, short version) {
       _source = source;
       _version = version;
     }

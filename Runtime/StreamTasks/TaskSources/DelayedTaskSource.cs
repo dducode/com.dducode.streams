@@ -10,23 +10,19 @@ namespace Streams.StreamTasks.TaskSources {
       _time = value;
     }
 
-    public override void Invoke(float deltaTime) {
-      if (IsCompleted)
-        return;
-
-      if (CancellationToken.Released) {
-        SetCanceled();
-        return;
-      }
+    public override bool Invoke(float deltaTime) {
+      if (!base.Invoke(deltaTime))
+        return false;
 
       _time = MathF.Max(0, _time - deltaTime);
       if (_time > 0)
-        return;
+        return true;
 
       SetResult();
+      return false;
     }
 
-    public override void Reset() {
+    private protected override void Reset() {
       base.Reset();
       _time = 0;
     }

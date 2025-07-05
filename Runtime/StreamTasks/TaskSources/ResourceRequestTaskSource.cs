@@ -2,32 +2,28 @@ using UnityEngine;
 
 namespace Streams.StreamTasks.TaskSources {
 
-  public class ResourceRequestTaskSource : RunnableTaskSource<ResourceRequest, Object> {
+  internal class ResourceRequestTaskSource : RunnableTaskSource<ResourceRequest, Object> {
 
-    internal ResourceRequest request;
+    private ResourceRequest _request;
 
     public override void Setup(ResourceRequest value) {
-      request = value;
+      _request = value;
     }
 
-    public override void Invoke(float deltaTime) {
-      if (IsCompleted)
-        return;
+    public override bool Invoke(float deltaTime) {
+      if (!base.Invoke(deltaTime))
+        return false;
 
-      if (CancellationToken.Released) {
-        SetCanceled();
-        return;
-      }
+      if (!_request.isDone)
+        return true;
 
-      if (!request.isDone)
-        return;
-
-      SetResult(request.asset);
+      SetResult(_request.asset);
+      return false;
     }
 
-    public override void Reset() {
+    private protected override void Reset() {
       base.Reset();
-      request = null;
+      _request = null;
     }
 
   }

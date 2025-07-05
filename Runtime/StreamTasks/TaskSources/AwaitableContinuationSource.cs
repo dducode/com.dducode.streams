@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Streams.StreamTasks.TaskSources {
 
-  public class AwaitableContinuationSource : RunnableTaskSource<Awaitable> {
+  internal class AwaitableContinuationSource : RunnableTaskSource<Awaitable> {
 
     private Awaitable _awaitable;
 
@@ -12,17 +12,9 @@ namespace Streams.StreamTasks.TaskSources {
       _awaitable = value;
     }
 
-    public override void Invoke(float deltaTime) {
-      if (IsCompleted)
-        return;
-
-      if (CancellationToken.Released) {
-        SetCanceled();
-        return;
-      }
-
+    public override bool Invoke(float deltaTime) {
       if (!_awaitable.GetAwaiter().IsCompleted)
-        return;
+        return true;
 
       try {
         _awaitable.GetAwaiter().GetResult();
@@ -34,16 +26,18 @@ namespace Streams.StreamTasks.TaskSources {
       catch (Exception e) {
         SetException(e);
       }
+
+      return false;
     }
 
-    public override void Reset() {
+    private protected override void Reset() {
       base.Reset();
       _awaitable = null;
     }
 
   }
 
-  public class AwaitableContinuationSource<TResult> : RunnableTaskSource<Awaitable<TResult>, TResult> {
+  internal class AwaitableContinuationSource<TResult> : RunnableTaskSource<Awaitable<TResult>, TResult> {
 
     private Awaitable<TResult> _awaitable;
 
@@ -51,17 +45,9 @@ namespace Streams.StreamTasks.TaskSources {
       _awaitable = value;
     }
 
-    public override void Invoke(float deltaTime) {
-      if (IsCompleted)
-        return;
-
-      if (CancellationToken.Released) {
-        SetCanceled();
-        return;
-      }
-
+    public override bool Invoke(float deltaTime) {
       if (!_awaitable.GetAwaiter().IsCompleted)
-        return;
+        return true;
 
       try {
         SetResult(_awaitable.GetAwaiter().GetResult());
@@ -72,9 +58,11 @@ namespace Streams.StreamTasks.TaskSources {
       catch (Exception e) {
         SetException(e);
       }
+
+      return false;
     }
 
-    public override void Reset() {
+    private protected override void Reset() {
       base.Reset();
       _awaitable = null;
     }

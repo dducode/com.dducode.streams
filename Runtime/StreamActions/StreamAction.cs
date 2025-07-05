@@ -60,10 +60,12 @@ namespace Streams.StreamActions {
       lockToken.Register(_lockersDecrement);
     }
 
-    public override void Invoke(float deltaTime) {
-      base.Invoke(deltaTime);
+    public override bool Invoke(float deltaTime) {
+      if (!base.Invoke(deltaTime))
+        return false;
+
       if (IsLocked)
-        return;
+        return true;
 
       _ticks++;
       _accumulatedDeltaTime += deltaTime;
@@ -74,13 +76,15 @@ namespace Streams.StreamActions {
           _accumulatedDeltaTime = 0;
         }
 
-        return;
+        return true;
       }
 
       while (_accumulatedDeltaTime > _configuration.Delta || Mathf.Approximately(_accumulatedDeltaTime, _configuration.Delta)) {
         _action(_configuration.Delta);
         _accumulatedDeltaTime -= _configuration.Delta;
       }
+
+      return true;
     }
 
   }

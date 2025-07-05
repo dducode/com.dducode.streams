@@ -15,6 +15,14 @@ namespace Streams.Extensions {
       await continuation();
     }
 
+    public static async StreamTask ContinueWith<TResult>(this StreamTask<TResult> task, Action<TResult> continuation) {
+      continuation(await task);
+    }
+
+    public static async StreamTask ContinueWith<TResult>(this StreamTask<TResult> task, Func<TResult, StreamTask> continuation) {
+      await continuation(await task);
+    }
+
   }
 
 }

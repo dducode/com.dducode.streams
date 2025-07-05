@@ -4,32 +4,48 @@ using Streams.StreamTasks;
 
 namespace Streams.StreamActions {
 
-  internal sealed class AsyncOnceAction : StreamActionBase, ICallbackCompletable {
-
-    public bool IsCompleted => _completion.IsCompleted;
+  internal sealed class AsyncOnceAction : StreamActionBase, IInitializable, ICompletable {
 
     private readonly Func<StreamTask> _action;
     private readonly Completion _completion = new();
-    private StreamTask? _task;
+
+    private StreamTask _task;
+    private bool _completionRequested;
 
     internal AsyncOnceAction(Func<StreamTask> action, StreamToken cancellationToken) : base(cancellationToken) {
       _action = action;
+    }
+
+    public void Initialize() {
+      _task = _action();
+      StreamTaskAwaiter awaiter = _task.GetAwaiter();
+      if (awaiter.IsCompleted) {
+        _completionRequested = true;
+        return;
+      }
+
+      awaiter.OnCompleted(() => _completionRequested = true);
     }
 
     public void OnComplete(Action onComplete, StreamToken subscriptionToken = default) {
       _completion.OnComplete(onComplete, subscriptionToken);
     }
 
-    public override void Invoke(float deltaTime) {
-      base.Invoke(deltaTime);
+    public override bool Invoke(float deltaTime) {
+      StreamTaskAwaiter awaiter = _task.GetAwaiter();
 
-      _task ??= _action();
+      if (!base.Invoke(deltaTime)) {
+        awaiter.OnCompleted(awaiter.GetResult);
+        return false;
+      }
 
-      if (!_task.Value.GetAwaiter().IsCompleted)
-        return;
+      if (_completionRequested) {
+        awaiter.GetResult();
+        _completion.Complete();
+        return false;
+      }
 
-      _task.Value.GetAwaiter().GetResult();
-      _completion.Complete();
+      return true;
     }
 
   }

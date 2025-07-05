@@ -137,7 +137,7 @@ namespace Streams {
     /// <exception cref="StreamDisposedException"> Threw if the stream is disposed </exception>
     public ManagedExecutionStream Join(ManagedExecutionStream other) {
       ValidateStreamState();
-      if (other.Priority < Priority)
+      if (Priority > other.Priority)
         return other.Join(this);
 
       if (RunningStream == this || RunningStream == other)

@@ -3,9 +3,9 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.PlayerLoop;
 
-namespace Streams.Extensions {
+namespace Streams.ReactInput {
 
-  public static class ReactInput {
+  public static class InputExtensions {
 
     public static void WhenPressed(this KeyCode keyCode, Action handler, StreamToken token = default) {
       When(() => Input.GetKeyDown(keyCode), handler, token);
