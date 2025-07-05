@@ -6,10 +6,9 @@ namespace Streams.StreamTasks.TaskSources {
   internal static class TaskSourcePool {
 
     private static readonly Dictionary<Type, Stack<IStreamTaskSource>> _pool = new();
-    private static readonly object _poolLock = new();
 
     internal static TSource Get<TSource>() where TSource : class, IStreamTaskSource, new() {
-      lock (_poolLock)
+      lock (_pool)
         if (_pool.TryGetValue(typeof(TSource), out Stack<IStreamTaskSource> stack))
           if (stack.TryPop(out IStreamTaskSource source))
             return (TSource)source;
@@ -19,7 +18,7 @@ namespace Streams.StreamTasks.TaskSources {
 
     internal static void Return(IStreamTaskSource source) {
       Type sourceType = source.GetType();
-      lock (_poolLock) {
+      lock (_pool) {
         if (!_pool.ContainsKey(sourceType))
           _pool.Add(sourceType, new Stack<IStreamTaskSource>());
         _pool[sourceType].Push(source);

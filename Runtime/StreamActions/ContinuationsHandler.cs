@@ -7,24 +7,23 @@ namespace Streams.StreamActions {
   internal sealed class ContinuationsHandler : StreamActionBase, IDisposable {
 
     private readonly Queue<Action> _continuations = new();
-    private readonly object _lock = new();
 
     internal ContinuationsHandler(StreamToken cancellationToken) : base(cancellationToken) {
     }
 
     internal void Enqueue(Action continuation) {
-      lock (_lock)
+      lock (_continuations)
         _continuations.Enqueue(continuation);
     }
 
     internal void CopyFrom(ContinuationsHandler other) {
       foreach (Action continuation in other._continuations)
-        lock (_lock)
+        lock (_continuations)
           _continuations.Enqueue(continuation);
     }
 
     public override bool Invoke(float deltaTime) {
-      lock (_lock) {
+      lock (_continuations) {
         while (_continuations.TryDequeue(out Action continuation)) {
           try {
             continuation();

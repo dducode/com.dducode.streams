@@ -30,7 +30,7 @@ namespace Streams.Internal {
         Application.quitting += Shutdown;
     }
 
-    public static void QueueWorkItem([NotNull] Action<WorkerState> task, [NotNull] WorkerState state) {
+    internal static void QueueWorkItem([NotNull] Action<WorkerState> task, [NotNull] WorkerState state) {
       if (task == null)
         throw new ArgumentNullException(nameof(task));
       if (state == null)

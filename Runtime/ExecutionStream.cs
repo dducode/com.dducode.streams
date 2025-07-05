@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using JetBrains.Annotations;
 using Streams.Exceptions;
 using Streams.Internal;
@@ -52,29 +53,29 @@ namespace Streams {
 
     private readonly List<ActionsStorage> _allStorages;
     private readonly List<IDisposable> _disposables;
-    private readonly ActionsStorage _actionsStorage = new();
-    private readonly ActionsStorage _parallelActionsStorage = new() { Sorted = false };
+
+    private readonly ActionsStorage _invokablesStorage = new();
+    private readonly ActionsStorage _concurrentInvokablesStorage = new() { Sorted = false };
     private readonly ActionsStorage _taskSourcesStorage = new() { Sorted = false };
 
-    private ContinuationsHandler _continuationsHandler;
-    private Initializer _initializer;
+    private readonly ContinuationsHandler _continuationsHandler = new(StreamToken.None);
+    private readonly ContinuationsHandler _concurrentContinuationsHandler = new(StreamToken.None);
 
     private readonly ParallelActionsWorker _worker = new();
     private readonly Action<float, int> _handleParallelAction;
 
     private readonly string _name;
-    private readonly string _profilerName;
 
     internal ExecutionStream(string name) {
-      _name = name;
-      _profilerName = $"{_name} (stream)";
+      _name = $"{name} (stream)";
       _handleParallelAction = HandleParallelInvokable;
+
       _allStorages = new List<ActionsStorage>(new[] {
-        _actionsStorage, _parallelActionsStorage, _taskSourcesStorage
+        _invokablesStorage, _concurrentInvokablesStorage, _taskSourcesStorage
       });
-      _disposables = new List<IDisposable>(new[] {
-        _actionsStorage, _parallelActionsStorage, _taskSourcesStorage
-      });
+
+      _disposables = new List<IDisposable>(_allStorages);
+      _concurrentInvokablesStorage.Add(_concurrentContinuationsHandler);
     }
 
     /// <summary>
@@ -85,10 +86,10 @@ namespace Streams {
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     public IConfigurable Add([NotNull] Action<float> action, StreamToken token = default) {
-      ValidateAddAction(action);
+      ValidateAdd(action);
 
       var streamAction = new StreamAction(action, token);
-      _actionsStorage.Add(streamAction);
+      _invokablesStorage.Add(streamAction);
       return streamAction;
     }
 
@@ -100,11 +101,18 @@ namespace Streams {
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     public void Add([NotNull] Func<CashedTask> action, StreamToken token = default) {
-      ValidateAddAction(action);
+      ValidateAdd(action);
 
       var asyncAction = new AsyncAction(action, token);
-      ScheduleInitializable(asyncAction);
-      _actionsStorage.Add(asyncAction);
+      _invokablesStorage.Add(asyncAction);
+    }
+
+    /// <summary>
+    /// Adds an object to run in the current stream
+    /// </summary>
+    public void Add([NotNull] IInvokable invokable) {
+      ValidateAdd(invokable);
+      _invokablesStorage.Add(invokable);
     }
 
     /// <summary>
@@ -115,10 +123,10 @@ namespace Streams {
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     public IConfigurable AddConcurrent([NotNull] Action<float> action, StreamToken token = default) {
-      ValidateAddAction(action);
+      ValidateAdd(action);
 
       var streamAction = new StreamAction(action, token);
-      _parallelActionsStorage.Add(streamAction);
+      _concurrentInvokablesStorage.Add(streamAction);
       return streamAction;
     }
 
@@ -130,11 +138,18 @@ namespace Streams {
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     public void AddConcurrent([NotNull] Func<CashedTask> action, StreamToken token = default) {
-      ValidateAddAction(action);
+      ValidateAdd(action);
 
       var asyncAction = new AsyncAction(action, token);
-      ScheduleInitializable(asyncAction);
-      _parallelActionsStorage.Add(asyncAction);
+      _concurrentInvokablesStorage.Add(asyncAction);
+    }
+
+    /// <summary>
+    /// Adds an object to run in the current stream in parallel
+    /// </summary>
+    public void AddConcurrent([NotNull] IInvokable invokable) {
+      ValidateAdd(invokable);
+      _concurrentInvokablesStorage.Add(invokable);
     }
 
     /// <summary>
@@ -145,10 +160,10 @@ namespace Streams {
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     public ICompletable AddOnce([NotNull] Action action, StreamToken token = default) {
-      ValidateAddAction(action);
+      ValidateAdd(action);
 
       var onceAction = new OnceAction(action, token);
-      _actionsStorage.Add(onceAction);
+      _invokablesStorage.Add(onceAction);
       return onceAction;
     }
 
@@ -160,11 +175,10 @@ namespace Streams {
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
     public ICompletable AddOnce([NotNull] Func<StreamTask> action, StreamToken token = default) {
-      ValidateAddAction(action);
+      ValidateAdd(action);
 
       var asyncOnceAction = new AsyncOnceAction(action, token);
-      ScheduleInitializable(asyncOnceAction);
-      _actionsStorage.Add(asyncOnceAction);
+      _invokablesStorage.Add(asyncOnceAction);
       return asyncOnceAction;
     }
 
@@ -183,10 +197,10 @@ namespace Streams {
       if (time < 0)
         throw new ArgumentOutOfRangeException(nameof(time), $"Time is negative: {time}");
 
-      ValidateAddAction(action);
+      ValidateAdd(action);
 
       var delayedAction = new DelayedAction(time, action, token);
-      _actionsStorage.Add(delayedAction);
+      _invokablesStorage.Add(delayedAction);
       return delayedAction;
     }
 
@@ -216,11 +230,10 @@ namespace Streams {
     }
 
     protected void CopyFrom(ExecutionStream other) {
-      _actionsStorage.CopyFrom(other._actionsStorage);
-      _parallelActionsStorage.CopyFrom(other._parallelActionsStorage);
+      _invokablesStorage.CopyFrom(other._invokablesStorage);
+      _concurrentInvokablesStorage.CopyFrom(other._concurrentInvokablesStorage);
       _taskSourcesStorage.CopyFrom(other._taskSourcesStorage);
 
-      _initializer.CopyFrom(other._initializer);
       _continuationsHandler.CopyFrom(other._continuationsHandler);
 
       _delayedCallbacks += other._delayedCallbacks;
@@ -234,29 +247,37 @@ namespace Streams {
 
     internal void AddInvokableTaskSource(IInvokable invokable) {
       ValidateStreamState();
-      _taskSourcesStorage.Add(invokable);
+      if (!Thread.CurrentThread.IsBackground)
+        _taskSourcesStorage.Add(invokable);
+      else
+        _concurrentInvokablesStorage.Add(invokable);
     }
 
     internal void ScheduleContinuation(Action continuation) {
       ValidateStreamState();
-      if (_continuationsHandler == null) {
-        _continuationsHandler = new ContinuationsHandler(StreamToken.None);
-        _actionsStorage.Add(_continuationsHandler);
-        _disposables.Add(_continuationsHandler);
-      }
-
-      _continuationsHandler.Enqueue(continuation);
+      if (!Thread.CurrentThread.IsBackground)
+        _continuationsHandler.Enqueue(continuation);
+      else
+        _concurrentContinuationsHandler.Enqueue(continuation);
     }
 
     internal virtual void Update(float deltaTime) {
       ValidateExecution();
 
       try {
+        State = StreamState.Running;
+        _streamsStack.Push(this);
+        Profiler.BeginSample(_name);
+
         Execute(deltaTime);
       }
       finally {
         _delayedCallbacks?.Invoke();
         _delayedCallbacks = null;
+
+        Profiler.EndSample();
+        _streamsStack.Pop();
+        State = StreamState.Idle;
       }
     }
 
@@ -270,26 +291,26 @@ namespace Streams {
       }
 
       State = StreamState.Terminating;
+      _streamsStack.Push(this);
+
+      try {
+        _terminateCallbacks?.Invoke();
+      }
+      catch (Exception e) {
+        Debug.LogError("An error occurred while executing terminate callbacks");
+        Debug.LogException(e);
+      }
+
+      _terminateCallbacks = null;
+      _delayedCallbacks = null;
+
       foreach (IDisposable disposable in _disposables)
         disposable.Dispose();
 
       _allStorages.Clear();
       _disposables.Clear();
-
-      _terminateCallbacks?.Invoke();
-      _terminateCallbacks = null;
-      _delayedCallbacks = null;
+      _streamsStack.Pop();
       State = StreamState.Terminated;
-    }
-
-    private void ScheduleInitializable(IInitializable initializable) {
-      ValidateStreamState();
-      if (_initializer == null) {
-        _initializer = new Initializer(StreamToken.None);
-        _disposables.Add(_initializer);
-      }
-
-      _initializer.Enqueue(initializable);
     }
 
     private void ValidateExecution() {
@@ -311,44 +332,32 @@ namespace Streams {
     }
 
     private void Execute(float deltaTime) {
-      State = StreamState.Running;
-      _streamsStack.Push(this);
-      Profiler.BeginSample(_profilerName);
-
-      _initializer.Invoke(deltaTime);
-
-      while (_initializer.corruptedObjects.TryDequeue(out IInitializable corrupted))
-        if (corrupted is IInvokable invokable)
-          foreach (ActionsStorage storage in _allStorages)
-            storage.Remove(invokable);
+      _continuationsHandler.Invoke(deltaTime);
 
       foreach (ActionsStorage storage in _allStorages)
         storage.Refresh();
 
-      _worker.Start(deltaTime, _parallelActionsStorage.Count, WorkStrategy, _handleParallelAction);
+      _worker.Start(deltaTime, _concurrentInvokablesStorage.Count, WorkStrategy, _handleParallelAction);
 
       for (var i = 0; i < _taskSourcesStorage.Count; i++)
         HandleInvokable(deltaTime, _taskSourcesStorage, i);
-      for (var i = 0; i < _actionsStorage.Count; i++)
-        HandleInvokable(deltaTime, _actionsStorage, i);
+      for (var i = 0; i < _invokablesStorage.Count; i++)
+        HandleInvokable(deltaTime, _invokablesStorage, i);
 
       _worker.Wait();
-
-      Profiler.EndSample();
-      _streamsStack.Pop();
-      State = StreamState.Idle;
     }
 
     private void HandleParallelInvokable(float deltaTime, int index) {
-      HandleInvokable(deltaTime, _parallelActionsStorage, index);
+      HandleInvokable(deltaTime, _concurrentInvokablesStorage, index);
     }
 
     private void HandleInvokable(float deltaTime, ActionsStorage storage, int index) {
       IInvokable invokable = storage[index];
 
       try {
-        if (!invokable.Invoke(deltaTime))
+        if (!invokable.Invoke(deltaTime)) {
           storage.Remove(invokable);
+        }
       }
       catch (Exception exception) {
         Debug.LogError($"An error occured while executing action <b>{invokable}</b>");
@@ -357,7 +366,7 @@ namespace Streams {
       }
     }
 
-    private void ValidateAddAction(Delegate action) {
+    private void ValidateAdd(object action) {
       ValidateStreamState();
       if (action == null)
         throw new ArgumentNullException(nameof(action));

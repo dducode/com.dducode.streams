@@ -16,8 +16,8 @@ namespace Streams.StreamTasks.Internal {
     }
 
     public void Start<TStateMachine>(ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine {
-      stateMachine.MoveNext();
       Task = new CashedTask { StateMachine = stateMachine };
+      stateMachine.MoveNext();
     }
 
     public void SetStateMachine(IAsyncStateMachine stateMachine) {

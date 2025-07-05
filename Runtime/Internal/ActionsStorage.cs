@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Streams.StreamActions;
+using UnityEngine;
 
 namespace Streams.Internal {
 
@@ -69,21 +70,55 @@ namespace Streams.Internal {
     }
 
     private void ApplyChanges() {
-      while (_pendingAddActions.TryDequeue(out IInvokable invokable)) {
-        _actions.Add(invokable);
-        _dirty = true;
+      while (_pendingAddActions.TryDequeue(out IInvokable invokable))
+        HandleAndAddObject(invokable);
+
+      while (_pendingRemoveActions.TryDequeue(out IInvokable invokable))
+        HandleAndRemoveObject(invokable);
+    }
+
+    private void HandleAndAddObject(IInvokable invokable) {
+      if (invokable is IInitializable initializable) {
+        try {
+          initializable.Initialize();
+        }
+        catch (Exception e) {
+          Debug.LogError($"An error occurred while initialize object with type <b>{initializable.GetType()}</b>");
+          Debug.LogException(e);
+          return;
+        }
       }
 
-      while (_pendingRemoveActions.TryDequeue(out IInvokable invokable)) {
-        _actions.Remove(invokable);
-        _dirty = true;
-      }
+      _actions.Add(invokable);
+      _dirty = true;
+    }
+
+    private void HandleAndRemoveObject(IInvokable invokable) {
+      if (invokable is IDisposable disposable)
+        DisposeInvokable(disposable);
+
+      _actions.Remove(invokable);
+      _dirty = true;
     }
 
     public void Dispose() {
+      foreach (IInvokable invokable in this)
+        if (invokable is IDisposable disposable)
+          DisposeInvokable(disposable);
+
       _actions.Clear();
       _pendingAddActions.Clear();
       _pendingRemoveActions.Clear();
+    }
+
+    private void DisposeInvokable(IDisposable disposable) {
+      try {
+        disposable.Dispose();
+      }
+      catch (Exception e) {
+        Debug.LogError($"An error occurred while dispose object with type <b>{disposable.GetType()}</b>");
+        Debug.LogException(e);
+      }
     }
 
     public struct Enumerator : IEnumerator<IInvokable> {

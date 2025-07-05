@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Streams.Exceptions;
 using Streams.StreamActions;
 using UnityEngine;
@@ -105,7 +106,7 @@ namespace Streams {
       _baseStream = baseStream;
       _execution = _baseStream.Add(Update, _subscriptionHandle.Token).SetPriority(_priority);
       _baseStream.OnTerminate(Dispose, _subscriptionHandle.Token);
-      _lockersDecrement = () => _lockers--;
+      _lockersDecrement = () => Interlocked.Decrement(ref _lockers);
     }
 
     /// <summary>
@@ -123,7 +124,7 @@ namespace Streams {
         throw new InvalidOperationException("Cannot lock a stream inside its execution");
 
       ValidateStreamState();
-      _lockers++;
+      Interlocked.Increment(ref _lockers);
       lockToken.Register(_lockersDecrement);
     }
 
