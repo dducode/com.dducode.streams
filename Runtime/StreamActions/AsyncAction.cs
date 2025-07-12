@@ -1,31 +1,34 @@
 using System;
-using Streams.StreamTasks.Internal;
+using Streams.StreamTasks;
 
 namespace Streams.StreamActions {
 
   internal sealed class AsyncAction : StreamActionBase {
 
-    private readonly Func<CashedTask> _action;
-    private CashedTask _task;
-    private bool _restart;
+    private readonly Func<StreamTask> _action;
+    private StreamTask.Awaiter _awaiter;
+    private bool _restart = true;
 
-    internal AsyncAction(Func<CashedTask> action, StreamToken cancellationToken) : base(cancellationToken) {
+    internal AsyncAction(Func<StreamTask> action, StreamToken cancellationToken) : base(cancellationToken) {
       _action = action;
     }
 
     public override bool Invoke(float deltaTime) {
-      if (!base.Invoke(deltaTime))
+      if (!base.Invoke(deltaTime)) {
+        if (!_awaiter.IsCompleted)
+          _awaiter.OnCompleted(_awaiter.GetResult);
         return false;
-
-      _task ??= _action();
+      }
 
       if (_restart) {
-        _task.Restart();
+        _awaiter = _action().GetAwaiter();
         _restart = false;
       }
 
-      if (_task.IsCompleted)
+      if (_awaiter.IsCompleted) {
+        _awaiter.GetResult();
         _restart = true;
+      }
 
       return true;
     }

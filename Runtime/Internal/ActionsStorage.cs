@@ -41,24 +41,51 @@ namespace Streams.Internal {
         _pendingRemoveActions.Enqueue(action);
     }
 
-    public void Refresh() {
-      ApplyChanges();
+    public void ApplyAdding() {
+      while (_pendingAddActions.TryDequeue(out IInvokable invokable))
+        HandleAndAddObject(invokable);
+
+      if (!Sorted)
+        return;
 
       if (_dirty) {
-        if (Sorted)
-          _actions.Sort(_comparer);
+        _actions.Sort(_comparer);
         _dirty = false;
       }
     }
 
+    public void ApplyRemoving() {
+      while (_pendingRemoveActions.TryDequeue(out IInvokable invokable))
+        HandleAndRemoveObject(invokable);
+    }
+
     public void CopyFrom(ActionsStorage other) {
-      foreach (IInvokable action in other)
-        _actions.Add(action);
+      foreach (IInvokable invokable in other._pendingAddActions)
+        _pendingAddActions.Enqueue(invokable);
+      foreach (IInvokable invokable in other._actions)
+        _actions.Add(invokable);
+      foreach (IInvokable invokable in other._pendingRemoveActions)
+        _pendingRemoveActions.Enqueue(invokable);
+
       _actions.Sort(_comparer);
     }
 
     public Enumerator GetEnumerator() {
-      return new Enumerator(_actions);
+      return new Enumerator(this);
+    }
+
+    public void Dispose() {
+      for (var i = 0; i < Count; i++)
+        if (this[i] is IDisposable disposable)
+          DisposeInvokable(disposable);
+
+      Clear();
+    }
+
+    public void Clear() {
+      _actions.Clear();
+      _pendingAddActions.Clear();
+      _pendingRemoveActions.Clear();
     }
 
     IEnumerator<IInvokable> IEnumerable<IInvokable>.GetEnumerator() {
@@ -67,14 +94,6 @@ namespace Streams.Internal {
 
     IEnumerator IEnumerable.GetEnumerator() {
       return GetEnumerator();
-    }
-
-    private void ApplyChanges() {
-      while (_pendingAddActions.TryDequeue(out IInvokable invokable))
-        HandleAndAddObject(invokable);
-
-      while (_pendingRemoveActions.TryDequeue(out IInvokable invokable))
-        HandleAndRemoveObject(invokable);
     }
 
     private void HandleAndAddObject(IInvokable invokable) {
@@ -101,16 +120,6 @@ namespace Streams.Internal {
       _dirty = true;
     }
 
-    public void Dispose() {
-      foreach (IInvokable invokable in this)
-        if (invokable is IDisposable disposable)
-          DisposeInvokable(disposable);
-
-      _actions.Clear();
-      _pendingAddActions.Clear();
-      _pendingRemoveActions.Clear();
-    }
-
     private void DisposeInvokable(IDisposable disposable) {
       try {
         disposable.Dispose();
@@ -123,25 +132,27 @@ namespace Streams.Internal {
 
     public struct Enumerator : IEnumerator<IInvokable> {
 
-      public IInvokable Current => _list[_index];
+      public IInvokable Current => _storage[_index];
       object IEnumerator.Current => Current;
 
-      private readonly List<IInvokable> _list;
+      private readonly ActionsStorage _storage;
       private int _index;
 
-      public Enumerator(List<IInvokable> list) {
-        _list = list;
+      public Enumerator(ActionsStorage storage) {
+        _storage = storage;
         _index = -1;
+        _storage.ApplyAdding();
       }
 
       public bool MoveNext() {
-        return ++_index < _list.Count;
+        return ++_index < _storage.Count;
       }
 
       public void Reset() {
       }
 
       public void Dispose() {
+        _storage.ApplyRemoving();
       }
 
     }

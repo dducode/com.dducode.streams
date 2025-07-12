@@ -22,7 +22,7 @@ namespace Streams.Extensions {
         }
       }
 
-      var source = TaskSourcePool.Get<SystemTaskContinuationSource>();
+      var source = Pool.Get<SystemTaskContinuationSource>();
       source.Setup(task);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
       return source.Task;
@@ -41,7 +41,7 @@ namespace Streams.Extensions {
         }
       }
 
-      var source = TaskSourcePool.Get<SystemTaskContinuationSource<TResult>>();
+      var source = Pool.Get<SystemTaskContinuationSource<TResult>>();
       source.Setup(task);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
       return source.Task;

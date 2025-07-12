@@ -3,7 +3,7 @@ using System;
 using Streams.StreamTasks.TaskSources;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
-namespace Streams.Addressables {
+namespace Streams.Extensions {
 
   internal class AsyncOperationHandleTaskSource<TResult> : RunnableTaskSource<AsyncOperationHandle<TResult>, TResult> {
 

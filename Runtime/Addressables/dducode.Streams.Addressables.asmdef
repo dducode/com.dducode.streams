@@ -1,6 +1,6 @@
 {
     "name": "dducode.Streams.Addressables",
-    "rootNamespace": "Streams.Addressables",
+    "rootNamespace": "Streams.Extensions",
     "references": [
         "GUID:c7b9315b3bb06e74cb9eeda4676457f5",
         "GUID:84651a3751eca9349aac36a66bba901b",

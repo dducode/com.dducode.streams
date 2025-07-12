@@ -6,7 +6,6 @@ using Streams.Exceptions;
 using Streams.Internal;
 using Streams.StreamActions;
 using Streams.StreamTasks;
-using Streams.StreamTasks.Internal;
 using UnityEngine.Profiling;
 using Debug = UnityEngine.Debug;
 
@@ -51,7 +50,6 @@ namespace Streams {
     private Action _terminateCallbacks;
     private Action _delayedCallbacks;
 
-    private readonly List<ActionsStorage> _allStorages;
     private readonly List<IDisposable> _disposables;
 
     private readonly ActionsStorage _invokablesStorage = new();
@@ -62,19 +60,20 @@ namespace Streams {
     private readonly ContinuationsHandler _concurrentContinuationsHandler = new(StreamToken.None);
 
     private readonly ParallelActionsWorker _worker = new();
-    private readonly Action<float, int> _handleParallelAction;
+    private readonly Action<float, int> _handleConcurrentInvokable;
 
     private readonly string _name;
 
     internal ExecutionStream(string name) {
       _name = $"{name} (stream)";
-      _handleParallelAction = HandleParallelInvokable;
+      _handleConcurrentInvokable = (deltaTime, index) => {
+        HandleInvokable(deltaTime, _concurrentInvokablesStorage, _concurrentInvokablesStorage[index]);
+      };
 
-      _allStorages = new List<ActionsStorage>(new[] {
+      _disposables = new List<IDisposable>(new[] {
         _invokablesStorage, _concurrentInvokablesStorage, _taskSourcesStorage
       });
 
-      _disposables = new List<IDisposable>(_allStorages);
       _concurrentInvokablesStorage.Add(_concurrentContinuationsHandler);
     }
 
@@ -100,7 +99,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public void Add([NotNull] Func<CashedTask> action, StreamToken token = default) {
+    public void Add([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAdd(action);
 
       var asyncAction = new AsyncAction(action, token);
@@ -137,7 +136,7 @@ namespace Streams {
     /// <param name="token"> Token for cancelling an action </param>
     /// <exception cref="StreamDisposedException"> Is thrown if the stream is disposed </exception>
     /// <exception cref="ArgumentNullException"> Is thrown if the passed action is null </exception>
-    public void AddConcurrent([NotNull] Func<CashedTask> action, StreamToken token = default) {
+    public void AddConcurrent([NotNull] Func<StreamTask> action, StreamToken token = default) {
       ValidateAdd(action);
 
       var asyncAction = new AsyncAction(action, token);
@@ -307,9 +306,30 @@ namespace Streams {
       foreach (IDisposable disposable in _disposables)
         disposable.Dispose();
 
-      _allStorages.Clear();
       _disposables.Clear();
       _streamsStack.Pop();
+      State = StreamState.Terminated;
+    }
+
+    private protected virtual void Clear() {
+      switch (State) {
+        case StreamState.Terminating or StreamState.Terminated:
+          return;
+        case StreamState.Running:
+          _delayedCallbacks += Clear;
+          return;
+      }
+
+      _invokablesStorage.Clear();
+      _concurrentInvokablesStorage.Clear();
+      _taskSourcesStorage.Clear();
+
+      _continuationsHandler.Dispose();
+
+      _terminateCallbacks = null;
+      _delayedCallbacks = null;
+
+      _disposables.Clear();
       State = StreamState.Terminated;
     }
 
@@ -334,30 +354,25 @@ namespace Streams {
     private void Execute(float deltaTime) {
       _continuationsHandler.Invoke(deltaTime);
 
-      foreach (ActionsStorage storage in _allStorages)
-        storage.Refresh();
+      _concurrentInvokablesStorage.ApplyAdding();
+      _worker.Start(deltaTime, _concurrentInvokablesStorage.Count, WorkStrategy, _handleConcurrentInvokable);
 
-      _worker.Start(deltaTime, _concurrentInvokablesStorage.Count, WorkStrategy, _handleParallelAction);
-
-      for (var i = 0; i < _taskSourcesStorage.Count; i++)
-        HandleInvokable(deltaTime, _taskSourcesStorage, i);
-      for (var i = 0; i < _invokablesStorage.Count; i++)
-        HandleInvokable(deltaTime, _invokablesStorage, i);
+      HandleStorage(deltaTime, _taskSourcesStorage);
+      HandleStorage(deltaTime, _invokablesStorage);
 
       _worker.Wait();
+      _concurrentInvokablesStorage.ApplyRemoving();
     }
 
-    private void HandleParallelInvokable(float deltaTime, int index) {
-      HandleInvokable(deltaTime, _concurrentInvokablesStorage, index);
+    private void HandleStorage(float deltaTime, ActionsStorage storage) {
+      foreach (IInvokable invokable in storage)
+        HandleInvokable(deltaTime, storage, invokable);
     }
 
-    private void HandleInvokable(float deltaTime, ActionsStorage storage, int index) {
-      IInvokable invokable = storage[index];
-
+    private void HandleInvokable(float deltaTime, ActionsStorage storage, IInvokable invokable) {
       try {
-        if (!invokable.Invoke(deltaTime)) {
+        if (!invokable.Invoke(deltaTime))
           storage.Remove(invokable);
-        }
       }
       catch (Exception exception) {
         Debug.LogError($"An error occured while executing action <b>{invokable}</b>");

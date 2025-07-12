@@ -1,7 +1,7 @@
 #if STREAMS_ADDRESSABLES_INTEGRATION
 using System.Threading.Tasks;
 using NUnit.Framework;
-using Streams.Addressables;
+using Streams.Extensions;
 using Streams.Tests.Attributes;
 using UnityEngine;
 using UnityEngine.PlayerLoop;

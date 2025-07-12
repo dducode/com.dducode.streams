@@ -12,7 +12,7 @@ namespace Streams.StreamTasks.TaskSources {
 
     public override bool Invoke(float deltaTime) {
       for (var i = 0; i < _tasks.Length; i++) {
-        StreamTaskAwaiter awaiter = _tasks[i].GetAwaiter();
+        StreamTask.Awaiter awaiter = _tasks[i].GetAwaiter();
         if (!awaiter.IsCompleted)
           continue;
 
@@ -36,7 +36,7 @@ namespace Streams.StreamTasks.TaskSources {
 
     private void SetupAwaitersCompletion() {
       for (var i = 0; i < _tasks.Length; i++) {
-        StreamTaskAwaiter awaiter = _tasks[i].GetAwaiter();
+        StreamTask.Awaiter awaiter = _tasks[i].GetAwaiter();
         if (!awaiter.IsCompleted)
           awaiter.OnCompleted(awaiter.GetResult);
       }

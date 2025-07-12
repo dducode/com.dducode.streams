@@ -12,10 +12,13 @@ namespace Streams.StreamTasks.TaskSources {
 
   }
 
-  internal interface IStreamTaskSource<TResult> : IStreamTaskSource {
+  internal interface IStreamTaskSource<TResult> {
 
-    new StreamTask<TResult> Task { get; }
-    new TResult GetResult(short version);
+    StreamTask<TResult> Task { get; }
+    TResult GetResult(short version);
+    StreamTaskStatus GetStatus(short version);
+    void OnCompleted(Action continuation, short version);
+    void SetCancellation(StreamToken cancellationToken);
 
   }
 

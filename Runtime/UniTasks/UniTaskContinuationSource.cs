@@ -3,7 +3,7 @@ using System;
 using Cysharp.Threading.Tasks;
 using Streams.StreamTasks.TaskSources;
 
-namespace Streams.UniTasks {
+namespace Streams.Extensions {
 
   internal class UniTaskContinuationSource : RunnableTaskSource<UniTask> {
 

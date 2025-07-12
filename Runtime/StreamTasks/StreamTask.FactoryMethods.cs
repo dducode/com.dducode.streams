@@ -29,8 +29,27 @@ namespace Streams.StreamTasks {
       if (milliseconds == 0)
         return CompletedTask;
 
-      var source = TaskSourcePool.Get<DelayedTaskSource>();
+      var source = Pool.Get<DelayedTaskSource>();
       source.Setup(milliseconds / 1000f);
+      source.SetCancellation(cancellationToken);
+      StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
+      return source.Task;
+    }
+
+    public static StreamTask DelayFrame(int frames) {
+      return DelayFrame(frames, StreamToken.None);
+    }
+
+    public static StreamTask DelayFrame(int frames, StreamToken cancellationToken) {
+      if (frames < 0)
+        throw new ArgumentOutOfRangeException(nameof(frames));
+      if (cancellationToken.Released)
+        return FromCanceled();
+      if (frames == 0)
+        return CompletedTask;
+
+      var source = Pool.Get<DelayFrameTaskSource>();
+      source.Setup(frames);
       source.SetCancellation(cancellationToken);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
       return source.Task;
@@ -50,7 +69,7 @@ namespace Streams.StreamTasks {
       if (!condition())
         return CompletedTask;
 
-      var source = TaskSourcePool.Get<ConditionalTaskSource>();
+      var source = Pool.Get<ConditionalTaskSource>();
       source.Setup(condition);
       source.SetCancellation(cancellationToken);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
@@ -64,9 +83,9 @@ namespace Streams.StreamTasks {
         return CompletedTask;
 
       for (var i = 0; i < tasks.Length; i++) {
-        StreamTaskAwaiter awaiter = tasks[i].GetAwaiter();
+        Awaiter awaiter = tasks[i].GetAwaiter();
         if (!awaiter.IsCompleted) {
-          var source = TaskSourcePool.Get<WhenAllTaskSource>();
+          var source = Pool.Get<WhenAllTaskSource>();
           source.Setup(tasks);
           StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
           return source.Task;
@@ -94,7 +113,7 @@ namespace Streams.StreamTasks {
         return CompletedTask;
 
       for (var i = 0; i < tasks.Length; i++) {
-        StreamTaskAwaiter awaiter = tasks[i].GetAwaiter();
+        Awaiter awaiter = tasks[i].GetAwaiter();
         if (!awaiter.IsCompleted)
           continue;
 
@@ -111,14 +130,14 @@ namespace Streams.StreamTasks {
         }
       }
 
-      var source = TaskSourcePool.Get<WhenAnyTaskSource>();
+      var source = Pool.Get<WhenAnyTaskSource>();
       source.Setup(tasks);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
       return source.Task;
 
       void SetupAwaitersCompletion() {
         for (var i = 0; i < tasks.Length; i++) {
-          StreamTaskAwaiter awaiter = tasks[i].GetAwaiter();
+          Awaiter awaiter = tasks[i].GetAwaiter();
           if (!awaiter.IsCompleted)
             awaiter.OnCompleted(awaiter.GetResult);
         }
@@ -126,31 +145,31 @@ namespace Streams.StreamTasks {
     }
 
     public static StreamTask<TResult> FromResult<TResult>(TResult result) {
-      var source = TaskSourcePool.Get<StreamTaskSource<TResult>>();
+      var source = Pool.Get<StreamTaskSource<TResult>>();
       source.SetResult(result);
       return source.Task;
     }
 
     public static StreamTask FromCanceled() {
-      var source = TaskSourcePool.Get<StreamTaskSource>();
+      var source = Pool.Get<StreamTaskSource>();
       source.SetCanceled();
       return source.Task;
     }
 
     public static StreamTask<TResult> FromCanceled<TResult>() {
-      var source = TaskSourcePool.Get<StreamTaskSource<TResult>>();
+      var source = Pool.Get<StreamTaskSource<TResult>>();
       source.SetCanceled();
       return source.Task;
     }
 
     public static StreamTask FromException(Exception error) {
-      var source = TaskSourcePool.Get<StreamTaskSource>();
+      var source = Pool.Get<StreamTaskSource>();
       source.SetException(error);
       return source.Task;
     }
 
     public static StreamTask<TResult> FromException<TResult>(Exception error) {
-      var source = TaskSourcePool.Get<StreamTaskSource<TResult>>();
+      var source = Pool.Get<StreamTaskSource<TResult>>();
       source.SetException(error);
       return source.Task;
     }

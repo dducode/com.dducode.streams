@@ -7,7 +7,7 @@ namespace Streams.Extensions {
 
   public static class ResourceRequestExtensions {
 
-    public static StreamTaskAwaiter<Object> GetAwaiter(this ResourceRequest request) {
+    public static StreamTask<Object>.Awaiter GetAwaiter(this ResourceRequest request) {
       return request.ToStreamTask(StreamToken.None).GetAwaiter();
     }
 
@@ -17,7 +17,7 @@ namespace Streams.Extensions {
       if (request.isDone)
         return StreamTask.FromResult(request.asset);
 
-      var source = TaskSourcePool.Get<ResourceRequestTaskSource>();
+      var source = Pool.Get<ResourceRequestTaskSource>();
       source.Setup(request);
       source.SetCancellation(cancellationToken);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);

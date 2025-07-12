@@ -19,8 +19,8 @@ namespace Streams.ReactInput {
       When(() => Input.GetKey(modifier1) && Input.GetKey(modifier2) && Input.GetKeyDown(keyCode), handler, token);
     }
 
-    public static void WhenHold(this KeyCode keyCode, Action<float> handler, StreamToken token = default) {
-      WhenHold(() => Input.GetKey(keyCode), handler, token);
+    public static void WhenHold(this KeyCode keyCode, float threshold, Action handler, StreamToken token = default) {
+      WhenHold(() => Input.GetKey(keyCode), threshold, handler, token);
     }
 
     public static void WhenReleased(this KeyCode keyCode, Action handler, StreamToken token = default) {
@@ -36,8 +36,8 @@ namespace Streams.ReactInput {
       When(action.WasPressedThisFrame, handler, token);
     }
 
-    public static void WhenHold(this InputAction action, Action<float> handler, StreamToken token = default) {
-      WhenHold(action.IsPressed, handler, token);
+    public static void WhenHold(this InputAction action, float threshold, Action handler, StreamToken token = default) {
+      WhenHold(action.IsPressed, threshold, handler, token);
     }
 
     public static void WhenReleased(this InputAction action, Action handler, StreamToken token = default) {
@@ -56,13 +56,19 @@ namespace Streams.ReactInput {
       }, token);
     }
 
-    private static void WhenHold(Func<bool> condition, Action<float> handler, StreamToken token) {
+    private static void WhenHold(Func<bool> condition, float threshold, Action handler, StreamToken token) {
       var holdingTime = 0f;
       UnityPlayerLoop.GetStream<Update>().Add(deltaTime => {
-        if (condition())
-          handler(holdingTime += deltaTime);
-        else
+        if (condition()) {
+          holdingTime += deltaTime;
+          if (holdingTime >= threshold) {
+            handler();
+            holdingTime = float.NegativeInfinity;
+          }
+        }
+        else {
           holdingTime = 0;
+        }
       }, token);
     }
 

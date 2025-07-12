@@ -114,7 +114,9 @@ namespace Streams.Tests {
 
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
         try {
+#pragma warning disable ST1001
           await Task.Delay(500);
+#pragma warning restore ST1001
           await StreamTask.Delay(500);
           tcs.SetResult(false);
         }
@@ -122,6 +124,21 @@ namespace Streams.Tests {
           Debug.Log($"StreamsException was thrown; message: <b>{exception.Message}</b>");
           tcs.SetResult(true);
         }
+      });
+
+      Assert.IsTrue(await tcs.Task);
+    }
+
+    [Test, StreamTasks]
+    public async Task FrameCountWaitingTest() {
+      var tcs = new TaskCompletionSource<bool>();
+      using var cts = new StreamTokenSource();
+      SetFailureAfterTime(2, tcs, cts.Token);
+
+      UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
+        int frame = Time.frameCount;
+        await StreamTask.DelayFrame(5);
+        tcs.SetResult(frame + 5 == Time.frameCount);
       });
 
       Assert.IsTrue(await tcs.Task);
@@ -243,10 +260,10 @@ namespace Streams.Tests {
       var tcs = new TaskCompletionSource<bool>();
       using var cts = new StreamTokenSource();
 
-      SetFailureAfterTime(2, tcs, cts.Token);
+      SetFailureAfterTime(1, tcs, cts.Token);
       var flag = false;
       ExecutionStream stream = UnityPlayerLoop.GetStream<Update>();
-      stream.AddDelayed(1, () => flag = true);
+      stream.AddDelayed(0.5f, () => flag = true);
       stream.AddOnce(async () => {
         await StreamTask.WaitWhile(() => !flag);
         tcs.SetResult(true);
@@ -267,8 +284,7 @@ namespace Streams.Tests {
 
       SetFailureAfterTime(2, tcs, cts.Token);
       UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
-        StreamTask streamTask = StreamTask.Delay(firstDelay);
-        await StreamTask.WhenAll(streamTask, StreamTask.Delay(secondDelay), StreamTask.Delay(thirdDelay));
+        await StreamTask.WhenAll(StreamTask.Delay(firstDelay), StreamTask.Delay(secondDelay), StreamTask.Delay(thirdDelay));
         tcs.SetResult(true);
       });
       Assert.IsTrue(await tcs.Task);

@@ -73,7 +73,7 @@ namespace Streams.StreamTasks.TaskSources {
         _version++;
       }
 
-      TaskSourcePool.Return(this);
+      Pool.Return(this);
     }
 
     private void Complete(Exception error = null) {
@@ -94,7 +94,6 @@ namespace Streams.StreamTasks.TaskSources {
   internal class StreamTaskSource<TResult> : IStreamTaskSource<TResult> {
 
     public StreamTask<TResult> Task => new(this, _version);
-    StreamTask IStreamTaskSource.Task => new(this, _version);
     private protected StreamToken CancellationToken { get; private set; } = StreamToken.None;
 
     private TResult _result;
@@ -135,10 +134,6 @@ namespace Streams.StreamTasks.TaskSources {
       CancellationToken = cancellationToken;
     }
 
-    void IStreamTaskSource.GetResult(short version) {
-      GetResult(version);
-    }
-
     internal void SetResult(TResult result) {
       if (CancellationToken.Released) {
         SetCanceled();
@@ -169,7 +164,7 @@ namespace Streams.StreamTasks.TaskSources {
         _version++;
       }
 
-      TaskSourcePool.Return(this);
+      Pool.Return(this);
     }
 
     private void Complete(TResult result, Exception error = null) {

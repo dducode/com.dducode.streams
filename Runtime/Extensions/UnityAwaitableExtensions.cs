@@ -24,7 +24,7 @@ namespace Streams.Extensions {
         }
       }
 
-      var source = TaskSourcePool.Get<AwaitableContinuationSource>();
+      var source = Pool.Get<AwaitableContinuationSource>();
       source.Setup(awaitable);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
       return source.Task;
@@ -44,7 +44,7 @@ namespace Streams.Extensions {
         }
       }
 
-      var source = TaskSourcePool.Get<AwaitableContinuationSource<TResult>>();
+      var source = Pool.Get<AwaitableContinuationSource<TResult>>();
       source.Setup(awaitable);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
       return source.Task;

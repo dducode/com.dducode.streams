@@ -9,8 +9,9 @@ namespace Streams.StreamTasks {
   public struct StreamTaskMethodBuilder {
 
     public StreamTask Task => _source?.Task ?? StreamTask.CompletedTask;
+
     private StreamTaskSource _source;
-    private Action _stateMachineMoveNext;
+    private IAsyncStateMachineRunner _stateMachineRunner;
 
     public static StreamTaskMethodBuilder Create() {
       return new StreamTaskMethodBuilder();
@@ -24,30 +25,53 @@ namespace Streams.StreamTasks {
     }
 
     public void SetResult() {
-      _source?.SetResult();
+      Complete();
     }
 
     public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : INotifyCompletion
       where TStateMachine : IAsyncStateMachine {
-      _source ??= TaskSourcePool.Get<StreamTaskSource>();
-      _stateMachineMoveNext ??= stateMachine.MoveNext;
-      awaiter.OnCompleted(_stateMachineMoveNext);
+      _stateMachineRunner ??= Pool.Get<AsyncStateMachineRunner<TStateMachine>>().SetStateMachine(stateMachine);
+      _source ??= Pool.Get<StreamTaskSource>();
+      awaiter.OnCompleted(_stateMachineRunner.MoveNextDelegate);
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : ICriticalNotifyCompletion
       where TStateMachine : IAsyncStateMachine {
-      _source ??= TaskSourcePool.Get<StreamTaskSource>();
-      _stateMachineMoveNext ??= stateMachine.MoveNext;
-      awaiter.UnsafeOnCompleted(_stateMachineMoveNext);
+      AwaitOnCompleted(ref awaiter, ref stateMachine);
     }
 
     public void SetException(Exception exception) {
-      if (_source == null)
-        throw exception;
+      Complete(exception);
+    }
 
-      _source.SetException(exception);
+    private void Complete(Exception error = null) {
+      try {
+        if (_source == null) {
+          if (error != null)
+            throw error;
+        }
+        else {
+          switch (error) {
+            case null:
+              _source.SetResult();
+              break;
+            case OperationCanceledException:
+              _source.SetCanceled();
+              break;
+            default:
+              _source.SetException(error);
+              break;
+          }
+        }
+      }
+      finally {
+        if (_stateMachineRunner != null) {
+          Pool.Return(_stateMachineRunner);
+          _stateMachineRunner = null;
+        }
+      }
     }
 
   }
@@ -56,8 +80,9 @@ namespace Streams.StreamTasks {
   public struct StreamTaskMethodBuilder<TResult> {
 
     public StreamTask<TResult> Task => _source.Task;
+
     private StreamTaskSource<TResult> _source;
-    private Action _stateMachineMoveNext;
+    private IAsyncStateMachineRunner _stateMachineRunner;
 
     public static StreamTaskMethodBuilder<TResult> Create() {
       return new StreamTaskMethodBuilder<TResult>();
@@ -71,31 +96,49 @@ namespace Streams.StreamTasks {
     }
 
     public void SetResult(TResult result) {
-      _source ??= TaskSourcePool.Get<StreamTaskSource<TResult>>();
-      _source.SetResult(result);
+      Complete(result);
     }
 
     public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : INotifyCompletion
       where TStateMachine : IAsyncStateMachine {
-      _source ??= TaskSourcePool.Get<StreamTaskSource<TResult>>();
-      _stateMachineMoveNext ??= stateMachine.MoveNext;
-      awaiter.OnCompleted(_stateMachineMoveNext);
+      _stateMachineRunner ??= Pool.Get<AsyncStateMachineRunner<TStateMachine>>().SetStateMachine(stateMachine);
+      _source ??= Pool.Get<StreamTaskSource<TResult>>();
+      awaiter.OnCompleted(_stateMachineRunner.MoveNextDelegate);
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
       where TAwaiter : ICriticalNotifyCompletion
       where TStateMachine : IAsyncStateMachine {
-      _source ??= TaskSourcePool.Get<StreamTaskSource<TResult>>();
-      _stateMachineMoveNext ??= stateMachine.MoveNext;
-      awaiter.UnsafeOnCompleted(_stateMachineMoveNext);
+      AwaitOnCompleted(ref awaiter, ref stateMachine);
     }
 
     public void SetException(Exception exception) {
-      if (_source == null)
-        throw exception;
+      Complete(default, exception);
+    }
 
-      _source.SetException(exception);
+    private void Complete(TResult result, Exception error = null) {
+      _source ??= Pool.Get<StreamTaskSource<TResult>>();
+
+      try {
+        switch (error) {
+          case null:
+            _source.SetResult(result);
+            break;
+          case OperationCanceledException:
+            _source.SetCanceled();
+            break;
+          default:
+            _source.SetException(error);
+            break;
+        }
+      }
+      finally {
+        if (_stateMachineRunner != null) {
+          Pool.Return(_stateMachineRunner);
+          _stateMachineRunner = null;
+        }
+      }
     }
 
   }

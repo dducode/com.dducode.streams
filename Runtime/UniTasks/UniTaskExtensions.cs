@@ -2,21 +2,20 @@
 using Cysharp.Threading.Tasks;
 using Streams.StreamTasks;
 using Streams.StreamTasks.Internal;
-using Streams.StreamTasks.TaskSources;
 
-namespace Streams.UniTasks {
+namespace Streams.Extensions {
 
   public static class UniTaskExtensions {
 
     public static StreamTask ToStreamTask(this UniTask uniTask) {
-      var source = TaskSourcePool.Get<UniTaskContinuationSource>();
+      var source = Pool.Get<UniTaskContinuationSource>();
       source.Setup(uniTask);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
       return source.Task;
     }
 
     public static StreamTask<TResult> ToStreamTask<TResult>(this UniTask<TResult> uniTask) {
-      var source = TaskSourcePool.Get<UniTaskContinuationSource<TResult>>();
+      var source = Pool.Get<UniTaskContinuationSource<TResult>>();
       source.Setup(uniTask);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
       return source.Task;

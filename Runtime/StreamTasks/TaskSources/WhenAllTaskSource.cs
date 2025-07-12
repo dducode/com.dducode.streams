@@ -15,7 +15,7 @@ namespace Streams.StreamTasks.TaskSources {
 
     public override bool Invoke(float deltaTime) {
       foreach (StreamTask task in _tasks) {
-        StreamTaskAwaiter awaiter = task.GetAwaiter();
+        StreamTask.Awaiter awaiter = task.GetAwaiter();
         if (!awaiter.IsCompleted)
           continue;
 

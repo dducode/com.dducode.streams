@@ -145,7 +145,7 @@ namespace Streams {
         throw new StreamsException($"Cannot join a running stream ({RunningStream})");
 
       CopyFrom(other);
-      other.Dispose();
+      other.Clear();
       return this;
     }
 
@@ -195,6 +195,13 @@ namespace Streams {
         return;
 
       base.Update(deltaTime);
+    }
+
+    private protected override void Clear() {
+      _subscriptionHandle.Release();
+      _subscriptionHandle = null;
+      _execution = null;
+      base.Clear();
     }
 
   }

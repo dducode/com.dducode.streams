@@ -2,14 +2,13 @@
 using System;
 using Streams.StreamTasks;
 using Streams.StreamTasks.Internal;
-using Streams.StreamTasks.TaskSources;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
-namespace Streams.Addressables {
+namespace Streams.Extensions {
 
   public static class AddressablesExtensions {
 
-    public static StreamTaskAwaiter<TResult> GetAwaiter<TResult>(this AsyncOperationHandle<TResult> handle) {
+    public static StreamTask<TResult>.Awaiter GetAwaiter<TResult>(this AsyncOperationHandle<TResult> handle) {
       return handle.ToStreamTask(StreamToken.None).GetAwaiter();
     }
 
@@ -27,7 +26,7 @@ namespace Streams.Addressables {
         return StreamTask.FromResult(handle.Result);
       }
 
-      var source = TaskSourcePool.Get<AsyncOperationHandleTaskSource<TResult>>();
+      var source = Pool.Get<AsyncOperationHandleTaskSource<TResult>>();
       source.Setup(handle);
       source.SetCancellation(cancellationToken);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);

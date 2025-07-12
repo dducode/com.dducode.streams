@@ -9,7 +9,7 @@ namespace Streams.Extensions {
 
   public static class UnityWebRequestExtensions {
 
-    public static StreamTaskAwaiter<UnityWebRequest> GetAwaiter(this UnityWebRequestAsyncOperation operation) {
+    public static StreamTask<UnityWebRequest>.Awaiter GetAwaiter(this UnityWebRequestAsyncOperation operation) {
       return operation.ToStreamTask(StreamToken.None).GetAwaiter();
     }
 
@@ -30,7 +30,7 @@ namespace Streams.Extensions {
         };
       }
 
-      var source = TaskSourcePool.Get<UnityWebRequestTaskSource>();
+      var source = Pool.Get<UnityWebRequestTaskSource>();
       source.Setup(operation);
       source.SetCancellation(cancellationToken);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);

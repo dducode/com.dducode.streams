@@ -23,7 +23,7 @@ namespace Streams.Extensions {
       if (asyncOperation.isDone)
         return StreamTask.CompletedTask;
 
-      var source = TaskSourcePool.Get<AsyncOperationTaskSource>();
+      var source = Pool.Get<AsyncOperationTaskSource>();
       source.Setup(asyncOperation);
       source.SetCancellation(cancellationToken);
       StreamTaskHelper.GetRunningStream().AddInvokableTaskSource(source);
