@@ -17,7 +17,7 @@ to a stream - it's persistent action. Also, you can connect parallel action, whi
 others
 
 ```csharp
-UnityPlayerLoop.GetStream<Update>().AddParallel(deltaTime => /* some actions */);
+UnityPlayerLoop.GetStream<Update>().AddConcurrent(deltaTime => /* some actions */);
 ```
 
 To configure the parallel work strategy, set the stream's `WorkStrategy` property to `Economy`, `Optimal` or `Performance`
@@ -41,26 +41,12 @@ UnityPlayerLoop.GetStream<Update>().AddOnce(async () => {
 You can use `StreamTask` inside the stream execution only. Also, you can convert `Task`, `UniTask` or `Awaitable` to `StreamTask` using extension methods.
 `StreamTask` allows code execution to continue in the same stream
 
-If you want to split the execution of an action over multiple frames, you can pass a coroutine to a stream
-
-```csharp
-UnityPlayerLoop.GetStream<Update>().Add(Coroutine);
-
-private IEnumerator Coroutine() {
-  Debug.Log(1);
-  yield return null;
-  Debug.Log(2);
-  yield return null;
-  Debug.Log(3);
-}
-```
-
 ## Execution configuration
 
 If you want, you can configure the action by setting the priority and subscription cancellation token
 
 ```csharp
-UnityPlayerLoop.GetStream<Update>().Add(deltaTime => Debug.Log(deltaTime), subscriptionToken, 0);
+UnityPlayerLoop.GetStream<Update>().Add(deltaTime => Debug.Log(deltaTime), subscriptionToken).SetPriority(0);
 ```
 
 Zero priority is the highest, the lowest priority is the max value of the `uint` type. If a token cancellation
