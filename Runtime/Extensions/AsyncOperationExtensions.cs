@@ -8,7 +8,7 @@ namespace Streams.Extensions {
   public static class AsyncOperationExtensions {
 
 #if !UNITY_2023_1_OR_NEWER
-    public static StreamTaskAwaiter GetAwaiter(this AsyncOperation asyncOperation) {
+    public static StreamTask.Awaiter GetAwaiter(this AsyncOperation asyncOperation) {
       return asyncOperation.ToStreamTask().GetAwaiter();
     }
 #endif
