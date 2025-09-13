@@ -1,7 +1,10 @@
 using System;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.PlayerLoop;
+
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Streams.ReactInput {
 
