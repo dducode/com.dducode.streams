@@ -1,3 +1,4 @@
+#if UNITY_INCLUDE_TESTS
 using System;
 using NUnit.Framework;
 using Unity.PerformanceTesting;
@@ -122,3 +123,4 @@ namespace Streams.Tests {
   }
 
 }
+#endif
